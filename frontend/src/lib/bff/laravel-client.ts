@@ -81,6 +81,7 @@ export async function callLaravelApi<T>(
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     signal: timeoutController.signal,
+    redirect: 'manual',
   };
 
   if (options.revalidateSeconds !== undefined && !options.bearerToken && (options.method ?? 'GET') === 'GET') {

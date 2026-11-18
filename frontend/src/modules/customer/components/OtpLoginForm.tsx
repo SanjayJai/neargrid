@@ -6,8 +6,22 @@ import { ArrowRight, KeyRound, Lock, RefreshCw, Smartphone } from 'lucide-react'
 import type { BffAuthClientData, OtpChallengeResponseDto } from '@/lib/bff/types';
 import { bffFetch } from '@/shared/api/bff-client';
 
-export function OtpLoginForm() {
+interface OtpLoginFormProps {
+  redirectTo?: string;
+}
+
+export function sanitizeInternalRedirectPath(raw?: string | null): string {
+  if (!raw) return '/dashboard/settings';
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.includes('\\')) {
+    return '/dashboard/settings';
+  }
+  return trimmed;
+}
+
+export function OtpLoginForm({ redirectTo }: OtpLoginFormProps) {
   const router = useRouter();
+  const safeRedirectTarget = sanitizeInternalRedirectPath(redirectTo);
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('+91');
   const [name, setName] = useState('');
@@ -118,7 +132,7 @@ export function OtpLoginForm() {
       }
 
       // Opaque HttpOnly session cookie is now set by Next.js BFF; Bearer token stays strictly server-side.
-      router.push('/dashboard/settings');
+      router.push(safeRedirectTarget);
       router.refresh();
     } catch {
       setErrorMessage('Network error during OTP verification.');
