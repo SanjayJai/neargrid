@@ -49,6 +49,7 @@ export async function bffFetch<T>(
   options: {
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
     body?: unknown;
+    signal?: AbortSignal;
   } = {}
 ): Promise<{ ok: boolean; status: number; payload: ApiEnvelope<T> | null }> {
   const method = options.method ?? 'GET';
@@ -70,6 +71,46 @@ export async function bffFetch<T>(
     credentials: 'same-origin',
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     cache: 'no-store',
+    signal: options.signal,
+  });
+
+  let payload: ApiEnvelope<T> | null = null;
+  if (response.status !== 204) {
+    try {
+      payload = (await response.json()) as ApiEnvelope<T>;
+    } catch {
+      payload = null;
+    }
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    payload,
+  };
+}
+
+/**
+ * Browser multipart/form-data upload helper for public business media & private KYC docs.
+ * Automatically injects double-submit CSRF header and same-origin credentials; never touches Bearer tokens.
+ */
+export async function bffUploadFormData<T>(
+  path: string,
+  formData: FormData,
+  options: { signal?: AbortSignal } = {}
+): Promise<{ ok: boolean; status: number; payload: ApiEnvelope<T> | null }> {
+  const csrfToken = await ensureCsrfToken();
+
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'X-CSRF-Token': csrfToken,
+    },
+    credentials: 'same-origin',
+    body: formData,
+    cache: 'no-store',
+    signal: options.signal,
   });
 
   let payload: ApiEnvelope<T> | null = null;

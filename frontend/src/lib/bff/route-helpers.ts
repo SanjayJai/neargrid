@@ -4,6 +4,17 @@ import { LaravelCallResult } from './laravel-client';
 import { clearOpaqueSessionCookie, readCurrentServerSession } from './session-cookie';
 import { BffSessionRecord, getBffSessionStore } from './session-store';
 
+const PUBLIC_ULID_REGEX = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
+const SAFE_SLUG_REGEX = /^[a-z0-9-]+$/;
+
+export function isValidPublicUlid(value: string): boolean {
+  return PUBLIC_ULID_REGEX.test(value);
+}
+
+export function isValidSlug(value: string): boolean {
+  return value.length >= 1 && value.length <= 140 && SAFE_SLUG_REGEX.test(value);
+}
+
 export function bffError(
   code: string,
   message: string,
@@ -54,9 +65,25 @@ export async function requireActiveBffSession(): Promise<
   };
 }
 
+export async function parseJsonBody(request: Request): Promise<
+  | { ok: true; data: unknown }
+  | { ok: false; response: NextResponse }
+> {
+  try {
+    const data: unknown = await request.json();
+    return { ok: true, data };
+  } catch {
+    return {
+      ok: false,
+      response: bffError('INVALID_JSON', 'Request body must be valid JSON.', 400),
+    };
+  }
+}
+
 export async function forwardLaravelJson<T>(
   result: LaravelCallResult<T>,
-  opaqueSessionId?: string
+  opaqueSessionId?: string,
+  options?: { forwardCacheHeaders?: boolean }
 ): Promise<NextResponse> {
   if (result.status === 204) {
     return new NextResponse(null, { status: 204 });
@@ -78,6 +105,16 @@ export async function forwardLaravelJson<T>(
   }
   if (result.requestId) {
     response.headers.set('X-Request-ID', result.requestId);
+  }
+  if (options?.forwardCacheHeaders) {
+    if (result.cacheControl) {
+      response.headers.set('Cache-Control', result.cacheControl);
+    }
+    if (result.robotsTag) {
+      response.headers.set('X-Robots-Tag', result.robotsTag);
+    }
+  } else {
+    response.headers.set('Cache-Control', 'private, no-store');
   }
 
   // Automatically expire local BFF session when Laravel rejects the Bearer token.

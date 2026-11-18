@@ -1,7 +1,61 @@
 /**
- * Frontend TypeScript contracts matching Laravel 13 Directory & Media Resources.
- * Prepared for Milestone 8 live integration; demo views remain clearly labelled until then.
+ * Typed frontend DTOs strictly matching actual Laravel 13 API Resources and FormRequests
+ * (Milestones 5, 6 & 7). Do NOT add unimplemented or invented response fields here.
  */
+
+import type { ApiMeta } from '@/lib/bff/types';
+
+// ---------------------------------------------------------------------------
+// Reference Locations, Taxonomy & Attributes (ReferenceTaxonomyController)
+// ---------------------------------------------------------------------------
+
+export interface ReferenceCityDto {
+  slug: string;
+  name: string;
+  name_en: string;
+  latitude: number | null;
+  longitude: number | null;
+  is_popular: boolean;
+}
+
+export interface ReferenceLocalityDto {
+  slug: string;
+  name: string;
+  pincode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface ReferenceCategoryChildDto {
+  public_id: string;
+  slug: string;
+  name: string;
+  schema_org_type: string;
+  icon_name: string | null;
+  is_featured: boolean;
+}
+
+export interface ReferenceCategoryDto extends ReferenceCategoryChildDto {
+  children: ReferenceCategoryChildDto[];
+}
+
+export interface ReferenceAttributesDto {
+  amenities: Array<{
+    slug: string;
+    name: string;
+    icon_name: string | null;
+    group_name: string | null;
+  }>;
+  payment_methods: Array<{
+    slug: string;
+    name: string;
+    icon_name: string | null;
+  }>;
+}
+
+// ---------------------------------------------------------------------------
+// Directory Models & Resources (PublicBusinessResource / OwnerBusinessResource)
+// ---------------------------------------------------------------------------
 
 export type BusinessStatusDto =
   | 'draft'
@@ -11,6 +65,14 @@ export type BusinessStatusDto =
   | 'rejected';
 
 export type BusinessMemberRoleDto = 'owner' | 'manager' | 'editor' | 'lead_agent';
+
+export type VerificationDocumentTypeDto =
+  | 'gstin'
+  | 'pan'
+  | 'trade_license'
+  | 'shop_act'
+  | 'utility_bill'
+  | 'incorporation_cert';
 
 export interface BusinessHourSlotDto {
   day_of_week: number;
@@ -31,6 +93,67 @@ export interface BusinessServiceDto {
   price_unit: string | null;
   sort_order: number;
   is_active: boolean;
+}
+
+export type BusinessMediaTypeDto =
+  | 'logo'
+  | 'cover'
+  | 'gallery'
+  | 'interior'
+  | 'exterior'
+  | 'product'
+  | 'menu'
+  | 'certificate';
+
+export type MediaUploadStatusDto = 'pending' | 'processing' | 'ready' | 'failed';
+
+export interface MediaVariantUrlsDto {
+  thumb: string | null;
+  card: string | null;
+  full: string | null;
+}
+
+export interface PublicBusinessMediaDto {
+  public_id: string;
+  media_type: BusinessMediaTypeDto;
+  alt_text: string | null;
+  width: number | null;
+  height: number | null;
+  sort_order: number;
+  urls: MediaVariantUrlsDto;
+}
+
+export interface OwnerBusinessMediaDto extends PublicBusinessMediaDto {
+  upload_status: MediaUploadStatusDto;
+  moderation_status: 'pending' | 'approved' | 'rejected';
+  mime_type: string;
+  file_size_bytes: number;
+  exif_stripped: boolean;
+  failure_reason: string | null;
+  processed_at: string | null;
+  created_at: string | null;
+}
+
+export interface KycDocumentDto {
+  public_id: string;
+  document_type: VerificationDocumentTypeDto | string;
+  upload_status: string;
+  mime_type: string;
+  file_size_bytes: number;
+  width: number | null;
+  height: number | null;
+  sha256_checksum: string;
+  created_at: string | null;
+}
+
+/**
+ * Server-only signed URL response from Laravel POST .../kyc-documents/{doc}/signed-url.
+ * NEVER expose this URL or signature to browser JavaScript; stream bytes via the BFF proxy.
+ */
+export interface LaravelKycSignedDownloadServerDto {
+  download_url: string;
+  expires_at: string;
+  ttl_seconds: number;
 }
 
 export interface PublicBusinessProfileDto {
@@ -82,62 +205,104 @@ export interface PublicBusinessProfileDto {
   media: PublicBusinessMediaDto[];
 }
 
-export type BusinessMediaTypeDto =
-  | 'logo'
-  | 'cover'
-  | 'gallery'
-  | 'interior'
-  | 'exterior'
-  | 'product'
-  | 'menu'
-  | 'certificate';
-
-export type MediaUploadStatusDto = 'pending' | 'processing' | 'ready' | 'failed';
-
-export interface MediaVariantUrlsDto {
-  thumb: string | null;
-  card: string | null;
-  full: string | null;
-}
-
-export interface PublicBusinessMediaDto {
+export interface OwnerBusinessProfileDto {
   public_id: string;
-  media_type: BusinessMediaTypeDto;
-  alt_text: string | null;
-  width: number | null;
-  height: number | null;
-  sort_order: number;
-  urls: MediaVariantUrlsDto;
+  name: string;
+  slug: string;
+  tagline: string | null;
+  description: string | null;
+  search_keywords: string | null;
+  year_established: number | null;
+  status: BusinessStatusDto;
+  is_claimed: boolean;
+  is_verified: boolean;
+  verified_at: string | null;
+  is_trusted: boolean;
+  completeness_score: number;
+  primary_category: {
+    public_id: string;
+    slug: string;
+    name: string;
+  } | null;
+  categories: Array<{
+    public_id: string;
+    slug: string;
+    name: string;
+    is_primary: boolean;
+  }>;
+  address: {
+    line_1: string;
+    line_2: string | null;
+    landmark: string | null;
+    locality_slug: string | null;
+    locality_name: string | null;
+    city_slug: string | null;
+    city_name: string | null;
+    pincode: string;
+    latitude: number;
+    longitude: number;
+  };
+  contact: {
+    primary_phone_e164: string;
+    secondary_phone_e164: string | null;
+    whatsapp_e164: string | null;
+    email: string | null;
+    website_url: string | null;
+  };
+  hours: BusinessHourSlotDto[];
+  services: BusinessServiceDto[];
+  amenities: string[];
+  payment_methods: string[];
+  my_membership: {
+    is_owner: boolean;
+    role: BusinessMemberRoleDto | null;
+    capabilities: string[];
+  } | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
-export interface OwnerBusinessMediaDto extends PublicBusinessMediaDto {
-  upload_status: MediaUploadStatusDto;
-  moderation_status: 'pending' | 'approved' | 'rejected';
-  mime_type: string;
-  file_size_bytes: number;
-  exif_stripped: boolean;
-  failure_reason: string | null;
-  processed_at: string | null;
+export interface OwnerHoursUpdateResponseDto {
+  business_public_id: string;
+  completeness_score: number;
+  hours: BusinessHourSlotDto[];
+}
+
+export interface BusinessMemberDto {
+  public_id: string;
+  role: BusinessMemberRoleDto;
+  status: string;
+  capabilities: string[];
+  user: {
+    public_id: string;
+    name: string | null;
+    phone_e164: string | null;
+  } | null;
+  accepted_at: string | null;
   created_at: string | null;
 }
 
-export interface KycDocumentDto {
+export interface BusinessVerificationDto {
   public_id: string;
-  document_type: string;
-  upload_status: string;
-  mime_type: string;
-  file_size_bytes: number;
-  width: number | null;
-  height: number | null;
-  sha256_checksum: string;
+  document_type: VerificationDocumentTypeDto | string;
+  status: string;
+  rejection_reason: string | null;
+  reviewed_at: string | null;
   created_at: string | null;
 }
 
-export interface KycSignedDownloadUrlDto {
-  download_url: string;
-  expires_at: string;
-  ttl_seconds: number;
+export interface BusinessClaimDto {
+  public_id: string;
+  status: string;
+  claim_notes: string | null;
+  review_notes: string | null;
+  reviewed_at: string | null;
+  created_at: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Search Engine DTOs (SearchController & SearchBusinessHitResource)
+// ---------------------------------------------------------------------------
 
 export type SearchSortOptionDto = 'relevance' | 'rating' | 'distance' | 'popularity' | 'newest';
 
@@ -185,6 +350,52 @@ export interface SearchSeoMetaDto {
   noindex_reason: string | null;
 }
 
+export interface SearchPaginationMetaDto {
+  type: 'offset';
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+  has_more: boolean;
+  sponsored_count: number;
+  returned_count: number;
+}
+
+export interface SearchAppliedFiltersDto {
+  q: string | null;
+  city: string | null;
+  category: string | null;
+  localities: string[];
+  radius_km: number | null;
+  has_coordinates: boolean;
+  min_rating: number | null;
+  verified_only: boolean;
+  open_now: boolean;
+  amenities: string[];
+  payment_methods: string[];
+  sort: SearchSortOptionDto;
+  locale: string;
+}
+
+export interface SearchResponseMetaDto extends ApiMeta {
+  pagination: SearchPaginationMetaDto;
+  applied_filters: SearchAppliedFiltersDto;
+  counts: {
+    total_organic: number;
+    sponsored_count: number;
+    returned_count: number;
+  };
+  query: {
+    original: string | null;
+    normalized: string | null;
+  };
+  seo: SearchSeoMetaDto;
+  performance: {
+    duration_ms: number;
+    driver: string;
+  };
+}
+
 export interface SearchSuggestionsDto {
   categories: Array<{ public_id: string; slug: string; name: string; type: 'category' }>;
   services: Array<{ name: string; type: 'service' }>;
@@ -207,48 +418,147 @@ export interface SearchSuggestionsDto {
   }>;
 }
 
-export interface OwnerBusinessProfileDto {
-  public_id: string;
+export interface SearchSuggestionsMetaDto extends ApiMeta {
+  query: {
+    original: string;
+    normalized: string;
+  };
+  cache: {
+    hit: boolean;
+    source: string;
+  };
+  performance: {
+    duration_ms: number;
+  };
+}
+
+export interface SearchFiltersDataDto {
+  cities: Array<{ slug: string; name: string; is_popular: boolean }>;
+  localities: Array<{
+    slug: string;
+    name: string;
+    pincode: string | null;
+    active_listing_count: number;
+  }>;
+  categories: Array<{
+    public_id: string;
+    slug: string;
+    name: string;
+    depth: number;
+    is_featured: boolean;
+  }>;
+  amenities: Array<{ slug: string; name: string; icon_name: string | null }>;
+  payment_methods: Array<{ slug: string; name: string }>;
+  rating_options: Array<{ value: number; label: string }>;
+  sort_options: Array<{ value: SearchSortOptionDto; label: string }>;
+  radius: {
+    min_km: number;
+    max_km: number;
+    default_km: number;
+  };
+}
+
+export interface SearchFiltersMetaDto extends ApiMeta {
+  counts: {
+    total_active: number;
+    verified_active: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Typed Request Payloads (matching Laravel FormRequests)
+// ---------------------------------------------------------------------------
+
+export interface SearchQueryParams {
+  q?: string;
+  city?: string;
+  category?: string;
+  locality?: string;
+  localities?: string[];
+  lat?: number;
+  lng?: number;
+  radius_km?: number;
+  min_rating?: number;
+  verified_only?: boolean;
+  open_now?: boolean;
+  amenities?: string[];
+  payment_methods?: string[];
+  sort?: SearchSortOptionDto;
+  page?: number;
+  per_page?: number;
+  locale?: 'en' | 'ta';
+}
+
+export interface CreateBusinessInput {
   name: string;
-  slug: string;
-  tagline: string | null;
-  description: string | null;
-  search_keywords: string | null;
-  year_established: number | null;
-  status: BusinessStatusDto;
-  is_claimed: boolean;
-  is_verified: boolean;
-  verified_at: string | null;
-  is_trusted: boolean;
-  completeness_score: number;
-  address: {
-    line_1: string;
-    line_2: string | null;
-    landmark: string | null;
-    locality_slug: string | null;
-    locality_name: string | null;
-    city_slug: string | null;
-    city_name: string | null;
-    pincode: string;
-    latitude: number;
-    longitude: number;
-  };
-  contact: {
-    primary_phone_e164: string;
-    secondary_phone_e164: string | null;
-    whatsapp_e164: string | null;
-    email: string | null;
-    website_url: string | null;
-  };
-  hours: BusinessHourSlotDto[];
-  services: BusinessServiceDto[];
-  amenities: string[];
-  payment_methods: string[];
-  my_membership: {
-    is_owner: boolean;
-    role: BusinessMemberRoleDto | null;
-    capabilities: string[];
-  } | null;
-  created_at: string | null;
-  updated_at: string | null;
+  tagline?: string | null;
+  description?: string | null;
+  search_keywords?: string | null;
+  year_established?: number | null;
+  primary_category_slug: string;
+  secondary_category_slugs?: string[];
+  city_slug: string;
+  locality_slug: string;
+  address_line_1: string;
+  address_line_2?: string | null;
+  landmark?: string | null;
+  pincode: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  primary_phone_e164: string;
+  secondary_phone_e164?: string | null;
+  whatsapp_e164?: string | null;
+  email?: string | null;
+  website_url?: string | null;
+  amenity_slugs?: string[];
+  payment_method_slugs?: string[];
+}
+
+export type UpdateBusinessInput = Partial<CreateBusinessInput> & {
+  slug?: string;
+};
+
+export interface ReplaceBusinessHoursInput {
+  hours: Array<{
+    day_of_week: number;
+    slot_index?: 1 | 2;
+    is_closed?: boolean;
+    is_24_hours?: boolean;
+    open_time?: string | null;
+    close_time?: string | null;
+  }>;
+}
+
+export interface UpsertBusinessServiceInput {
+  name: string;
+  description?: string | null;
+  price_min_minor?: number | null;
+  price_max_minor?: number | null;
+  currency?: string;
+  price_unit?: string | null;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
+export interface CreateBusinessMemberInput {
+  user_public_id: string;
+  role: Exclude<BusinessMemberRoleDto, 'owner'>;
+  permissions?: string[] | null;
+}
+
+export interface UpdateBusinessMemberInput {
+  role: Exclude<BusinessMemberRoleDto, 'owner'>;
+  permissions?: string[] | null;
+  status?: 'active' | 'suspended';
+}
+
+export interface SubmitBusinessClaimInput {
+  proof_file_path_private: string;
+  claim_notes?: string | null;
+}
+
+export interface SubmitVerificationInput {
+  document_type: VerificationDocumentTypeDto;
+  document_number: string;
+  private_file_path: string;
 }
