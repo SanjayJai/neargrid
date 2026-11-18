@@ -7,6 +7,7 @@ export interface LaravelCallOptions {
   requestId?: string | null;
   signal?: AbortSignal;
   revalidateSeconds?: number;
+  timeoutMs?: number;
 }
 
 export interface LaravelCallResult<T> {
@@ -62,11 +63,24 @@ export async function callLaravelApi<T>(
     headers['X-Request-ID'] = options.requestId;
   }
 
+  const timeoutMs = options.timeoutMs ?? 8000;
+  const timeoutController = new AbortController();
+  const timeoutHandle = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+  const onExternalAbort = () => timeoutController.abort();
+  if (options.signal) {
+    if (options.signal.aborted) {
+      timeoutController.abort();
+    } else {
+      options.signal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
+
   const fetchInit: RequestInit & { next?: { revalidate: number } } = {
     method: options.method ?? 'GET',
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    signal: options.signal,
+    signal: timeoutController.signal,
   };
 
   if (options.revalidateSeconds !== undefined && !options.bearerToken && (options.method ?? 'GET') === 'GET') {
@@ -75,7 +89,13 @@ export async function callLaravelApi<T>(
     fetchInit.cache = 'no-store';
   }
 
-  const response = await fetch(url, fetchInit);
+  let response: Response;
+  try {
+    response = await fetch(url, fetchInit);
+  } finally {
+    clearTimeout(timeoutHandle);
+    options.signal?.removeEventListener('abort', onExternalAbort);
+  }
 
   let payload: ApiEnvelope<T> | null = null;
   if (response.status !== 204) {

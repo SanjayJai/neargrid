@@ -118,4 +118,15 @@ describe('Step 2: Live Data & Geolocation Privacy Guardrails', () => {
       expect(effectBlock).not.toContain('geolocation');
     }
   });
+
+  it('isolates dev and production Next.js distDir and enforces server fetch timeout', () => {
+    const nextConfig = fs.readFileSync(path.resolve(root, 'next.config.mjs'), 'utf8');
+    expect(nextConfig).toContain('PHASE_DEVELOPMENT_SERVER');
+    expect(nextConfig).toContain("'.next-dev'");
+    expect(nextConfig).toContain("'.next'");
+
+    const laravelClient = fs.readFileSync(path.resolve(root, 'src/lib/bff/laravel-client.ts'), 'utf8');
+    expect(laravelClient).toContain('timeoutMs');
+    expect(laravelClient).toContain('timeoutController.abort()');
+  });
 });
