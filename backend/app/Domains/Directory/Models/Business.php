@@ -7,6 +7,8 @@ namespace App\Domains\Directory\Models;
 use App\Domains\Directory\Enums\BusinessStatus;
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
+use App\Domains\Media\Models\BusinessMedia;
+use App\Domains\Media\Models\KycDocument;
 use App\Domains\Taxonomy\Models\Amenity;
 use App\Domains\Taxonomy\Models\Category;
 use App\Domains\Taxonomy\Models\PaymentMethod;
@@ -196,6 +198,24 @@ class Business extends Model
     public function claims(): HasMany
     {
         return $this->hasMany(BusinessClaim::class)->latest();
+    }
+
+    /**
+     * @return HasMany<BusinessMedia, $this>
+     */
+    public function media(): HasMany
+    {
+        return $this->hasMany(BusinessMedia::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<KycDocument, $this>
+     */
+    public function kycDocuments(): HasMany
+    {
+        return $this->hasMany(KycDocument::class)->latest();
     }
 
     public function isPubliclyVisible(): bool

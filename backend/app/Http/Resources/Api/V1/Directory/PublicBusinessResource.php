@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources\Api\V1\Directory;
 
 use App\Domains\Directory\Models\Business;
+use App\Domains\Media\Models\BusinessMedia;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -98,6 +99,19 @@ final class PublicBusinessResource extends JsonResource
                 'question' => $faq->question,
                 'answer' => $faq->answer,
             ])->values()->all(),
+            'media' => $this->media
+                ->filter(static fn (BusinessMedia $item): bool => $item->isPubliclyDeliverable())
+                ->map(static fn (BusinessMedia $item): array => [
+                    'public_id' => $item->public_id,
+                    'media_type' => $item->media_type->value,
+                    'alt_text' => $item->alt_text,
+                    'width' => $item->width,
+                    'height' => $item->height,
+                    'sort_order' => $item->sort_order,
+                    'urls' => $item->publicUrls(),
+                ])
+                ->values()
+                ->all(),
         ];
     }
 }

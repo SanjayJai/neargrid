@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\Directory\OwnerBusinessController;
 use App\Http\Controllers\Api\V1\Directory\PublicBusinessController;
 use App\Http\Controllers\Api\V1\Directory\ReferenceTaxonomyController;
+use App\Http\Controllers\Api\V1\Media\BusinessMediaController;
+use App\Http\Controllers\Api\V1\Media\KycDocumentController;
 use App\Http\Controllers\Api\V1\SystemController;
 use Illuminate\Support\Facades\Route;
 
@@ -68,6 +70,22 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
             Route::get('/{business}/verifications', [OwnerBusinessController::class, 'indexVerifications'])->name('verifications.index');
             Route::post('/{business}/verifications', [OwnerBusinessController::class, 'storeVerification'])->name('verifications.store');
+
+            // Public business media management (logo, cover, gallery)
+            Route::get('/{business}/media', [BusinessMediaController::class, 'index'])->name('media.index');
+            Route::post('/{business}/media', [BusinessMediaController::class, 'store'])->name('media.store');
+            Route::delete('/{business}/media/{media}', [BusinessMediaController::class, 'destroy'])->name('media.destroy');
+
+            // Private KYC document uploads & short-lived signed URL issuance
+            Route::get('/{business}/kyc-documents', [KycDocumentController::class, 'index'])->name('kyc-documents.index');
+            Route::post('/{business}/kyc-documents', [KycDocumentController::class, 'store'])->name('kyc-documents.store');
+            Route::post('/{business}/kyc-documents/{kycDocument}/signed-url', [KycDocumentController::class, 'signedUrl'])->name('kyc-documents.signed-url');
+            Route::delete('/{business}/kyc-documents/{kycDocument}', [KycDocumentController::class, 'destroy'])->name('kyc-documents.destroy');
         });
+
+        // Short-lived, actor-bound, signature-verified private KYC download endpoint
+        Route::get('/kyc-documents/{kycDocument}/download', [KycDocumentController::class, 'download'])
+            ->middleware('signed')
+            ->name('kyc.download');
     });
 });

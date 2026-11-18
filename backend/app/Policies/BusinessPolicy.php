@@ -46,6 +46,15 @@ final class BusinessPolicy
         return $business->activeMemberFor($actor)?->hasCapability('services.edit') ?? false;
     }
 
+    public function manageMedia(User $actor, Business $business): bool
+    {
+        if ($business->isOwnedBy($actor)) {
+            return true;
+        }
+
+        return $business->activeMemberFor($actor)?->hasCapability('media.manage') ?? false;
+    }
+
     public function submitVerification(User $actor, Business $business): bool
     {
         if ($business->isOwnedBy($actor)) {

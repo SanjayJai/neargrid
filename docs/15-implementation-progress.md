@@ -3,11 +3,11 @@
 ## 1. Current Status Summary
 
 * **Active Phase:** Phase 3B — Business Directory Core, Media, Search & Live Integration
-* **Current Milestone Completed:** **Milestone 5 — Business Directory Backend**
-* **Next Planned Milestone:** **Milestone 6 — Media Pipeline (S3/MinIO Public + Private KYC Buckets, EXIF Stripping, Responsive WebP Transcoding)** (awaiting approval to proceed)
+* **Current Milestone Completed:** **Milestone 6 — Secure Media Pipeline**
+* **Next Planned Milestone:** **Milestone 7 — Search Engine (MySQL 8.0 Spatial + English/Tamil FullText, Bayesian Ranking, Sponsored Slots, Autocomplete & Benchmarks)** (awaiting approval to proceed)
 * **Stack Compliance Check:**
-  * Backend: Laravel `v13.43.0` (PHP `8.3.36`), `laravel/sanctum v4.5.0`, `predis/predis v3.7.1`, **Zero Filament**
-  * Frontend: Single Next.js `14.2.35` (App Router) + React `18.3.1` + TypeScript `5.7.2` + Tailwind CSS `3.4.19` + `ioredis` (Demo UI preserved honestly until Milestone 8; typed Directory DTO contracts prepared in `frontend/src/shared/api/directory-types.ts`)
+  * Backend: Laravel `v13.43.0` (PHP `8.3.36`), `laravel/sanctum v4.5.0`, `predis/predis v3.7.1`, `league/flysystem-aws-s3-v3 v3.35.3`, **Zero Filament**
+  * Frontend: Single Next.js `14.2.35` (App Router) + React `18.3.1` + TypeScript `5.7.2` + Tailwind CSS `3.4.19` + `ioredis` (Demo UI preserved honestly until Milestone 8; typed Directory & Media DTO contracts in `frontend/src/shared/api/directory-types.ts`)
 
 ---
 
@@ -21,8 +21,8 @@
 | **Phase 3A — M2** | Core Database Migrations (Identity, RBAC, OTP, Devices, Geography & Categories with EN/TA translations), Factories, Idempotent Reference Seeders, Isolated `DevSampleSeeder` | **Completed & Verified** | SQLite tests: **23 passed (173 assertions)**; MySQL 8.0 skipped: **1**; Pint: **passed** | `46fbf8e` |
 | **Phase 3A — M3** | Identity Domain: CSPRNG OTP, HMAC-SHA256, atomic single-use consumption, cooldown/rate limits, Sanctum Bearer tokens, device & session revocation, independent Laravel Policies & live DB RBAC middleware | **Completed & Verified** | SQLite tests: **34 passed (321 assertions)**; MySQL 8.0 skipped: **1**; Pint: **passed** | `e79a2b2` |
 | **Phase 3A — M4** | Single Next.js 14 + React 18 + Tailwind app (`frontend/`) with `(customer)` & `(business)` route groups, NearGrid UI, opaque HttpOnly BFF cookie + AES-256-GCM Redis session store, Origin + CSRF guards, live Auth/Settings wiring, Demo views (`docs/16`) | **Completed & Verified** | Vitest: **8 passed**; `tsc`: **0 errors**; `lint`: **0 errors**; `next build`: **17/17 routes**; live HTTP smoke test passed | `3010643` |
-| **Phase 3B — M5** | Business Directory Backend: Businesses, multi-business ownership, categories/services/amenities/payment methods/FAQs, addresses & SRID 4326 spatial columns, split-shift & midnight opening hours, encrypted KYC verifications (admin-separated), ownership claim workflow (separated from KYC verification), staff memberships & granular capabilities, `url_redirects` (301), `audit_logs`, independent Laravel Policies, privacy-safe `PublicBusinessResource`, Owner management APIs, EN/TA reference APIs, and frontend DTO contracts (`directory-types.ts`) | **Completed & Verified** | Clean 12-migration `migrate:fresh --seed`, re-run, rollback + re-migrate passed; Backend SQLite tests: **43 passed (456 assertions)**; MySQL 8.0 integration tests skipped: **2**; Pint: **passed**; Frontend `tsc`: **0 errors**; Frontend Vitest: **8 passed** | *(Milestone 5 commit)* |
-| **Phase 3B — M6** | Media Pipeline (MinIO/S3 public + private KYC buckets, EXIF stripping, WebP transcoding, signed URLs) | Pending | Not started | — |
+| **Phase 3B — M5** | Business Directory Backend: Businesses, multi-business ownership, categories/services/amenities/payment methods/FAQs, addresses & SRID 4326 spatial columns, split-shift & midnight opening hours, encrypted KYC verifications (admin-separated), ownership claim workflow (separated from KYC verification), staff memberships & granular capabilities, `url_redirects` (301), `audit_logs`, independent Laravel Policies, privacy-safe `PublicBusinessResource`, Owner management APIs, EN/TA reference APIs, and frontend DTO contracts (`directory-types.ts`) | **Completed & Verified** | Clean 12-migration `migrate:fresh --seed`, re-run, rollback + re-migrate passed; Backend SQLite tests: **43 passed (456 assertions)**; MySQL 8.0 integration tests skipped: **2**; Pint: **passed**; Frontend `tsc`: **0 errors**; Frontend Vitest: **8 passed** | `f00e875` |
+| **Phase 3B — M6** | Secure Media Pipeline: `business_media` & `kyc_documents` migrations/models (ULIDs), `league/flysystem-aws-s3-v3` S3/MinIO disk separation (`media_public` vs `kyc_private`), magic-byte signature validation (`FileSignatureValidator`), GD WebP transcoding (`thumb`/`card`/`full`) & EXIF/GPS stripping (`ImageProcessor`), configurable original preservation (`false` default), async `ProcessBusinessMediaJob` on `media` queue with retries & failure cleanup, actor-bound short-lived signed KYC downloads (`60s` TTL), `BusinessMediaPolicy` & `KycDocumentPolicy`, `PublicBusinessResource` approved-only media integration, and frontend media/KYC DTOs | **Completed & Verified** | Clean 13-migration `migrate:fresh --seed`, rollback + re-migrate passed; Backend SQLite tests: **52 passed (613 assertions)**; Skipped: **3** (2 MySQL 8.0 + 1 live MinIO/S3); Pint: **passed**; Frontend `tsc`: **0 errors**; Frontend Vitest: **8 passed** | *(Milestone 6 commit)* |
 | **Phase 3B — M7** | Search Engine (MySQL 8.0 Spatial + English/Tamil FullText, Bayesian ranking, Sponsored slots, Autocomplete & Benchmarks) | Pending | Not started | — |
 | **Phase 3B — M8** | Live Frontend Integration (wire NearGrid `(customer)` & `(business)` views to live Directory/Media/Search APIs via BFF, removing demo banners) | Pending | Not started | — |
 | **Phase 3C–3E** | Consented Enquiries, Reviews, Custom Blade Admin (2FA + KYC Queue), Payments/Webhooks & Production Hardening | Pending | Not started | — |
@@ -54,3 +54,39 @@
   * **Known Limitation:** Actual MySQL 8.0 and Docker are not installed on this local Windows machine (XAMPP has MariaDB 10.4.32, which is explicitly rejected by `MySql8DirectoryIntegrationTest`). Actual MySQL 8.0 `SRID 4326` spatial, `SPATIAL INDEX`, and `FULLTEXT` execution remains unverified until MySQL 8.0 is provisioned locally or in CI.
 * **Backend Code Style (`vendor/bin/pint --test`):** **Passed**.
 * **Frontend Checks:** `tsc --noEmit` (**0 errors**), `vitest run` (**8 passed**).
+
+---
+
+## 4. Milestone 6 Implementation & Verification Summary
+
+### 4.1 Backend Components Delivered
+* **Storage Configuration & Dependency:**
+  * Installed `league/flysystem-aws-s3-v3` (`^3.35`) for MinIO/S3-compatible object storage.
+  * Configured separate `media_public` and `kyc_private` disks in `backend/config/filesystems.php` and centralized pipeline limits/variants/queues in `backend/config/media.php` and `backend/.env.example`.
+* **Schema & Models:**
+  * `2026_11_18_110001_create_media_tables.php`: `business_media` (ULID `public_id`, `media_type`, `upload_status`, `moderation_status`, `disk`, staging/original/variant keys, MIME, size, dimensions, `exif_stripped`, `failure_reason`, `processed_at`) and `kyc_documents` (ULID `public_id`, optional FK to `business_verifications`, private `disk`/`storage_key`, MIME, size, dimensions, `sha256_checksum`).
+  * `BusinessMedia` & `KycDocument` models hide all internal integer IDs, disk names, and raw storage keys from default serialization.
+* **Upload Security & Image Pipeline:**
+  * `FileSignatureValidator`: Strictly validates raw magic bytes (JPEG/PNG/WebP; PDF for KYC), rejects executables/scripts/SVG/HTML/ZIP (`MZ`, `ELF`, `#!`, `<?php`, `<script`, `<svg`, `<!doctype`, `<html`, `PK\x03\x04`), cross-checks `finfo`, verifies GD decode + pixel bounds or PDF `%%EOF` structure, and enforces configurable byte (`413 FILE_TOO_LARGE`) and count limits without ever trusting client filenames, extensions, or MIME headers.
+  * `ImageProcessor`: Decodes through GD, auto-applies EXIF orientation before stripping 100% of EXIF/GPS/XMP metadata, and encodes clean `thumb` (`<=320w`), `card` (`<=640w`), and `full` (`<=1280w`) WebP variants without upscaling (preserving PNG/WebP transparency).
+  * `ProcessBusinessMediaJob`: Queued on `media` queue (`$tries = 4`, backoff `[30, 120, 600]`, `$timeout = 120`), cleans up partial variant writes on transient storage errors, removes staged originals unless `media.preserve_originals=true`, marks permanent failures with sanitized `failure_reason` + staging cleanup, and updates `businesses.photo_count` and `completeness_score`.
+* **Authorization, Private KYC Signed Access & Public Storefront Integration:**
+  * Added `media.manage` capability (`Owner`, `Manager`, `Editor`; denied to `LeadAgent`), `BusinessPolicy::manageMedia`, `BusinessMediaPolicy`, and `KycDocumentPolicy` (independent of Sanctum token abilities).
+  * REST Endpoints (`/api/v1/*`):
+    * Public Business Media: `GET/POST /owner/businesses/{business}/media`, `DELETE /owner/businesses/{business}/media/{media}`.
+    * Private KYC Documents: `GET/POST /owner/businesses/{business}/kyc-documents`, `POST /owner/businesses/{business}/kyc-documents/{kycDocument}/signed-url`, `DELETE /owner/businesses/{business}/kyc-documents/{kycDocument}`.
+    * Signed Private Download: `GET /kyc-documents/{kycDocument}/download` (`auth:sanctum`, `active`, `signed`, actor-bound `?actor={user_public_id}`, live `KycDocumentPolicy::download`, `Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff`, audited).
+  * Updated `PublicBusinessResource` and `PublicBusinessController::show()` to expose ONLY `ready` + `approved` public media URLs and zero private KYC fields or raw storage keys.
+* **Frontend DTO Preparation:** Added `PublicBusinessMediaDto`, `OwnerBusinessMediaDto`, `KycDocumentDto`, and `KycSignedDownloadUrlDto` in `frontend/src/shared/api/directory-types.ts`.
+
+### 4.2 Test Counts & Known Local Limitations
+* **Backend Automated Tests (`php artisan test` on SQLite + `Storage::fake`):** **52 passed (613 assertions)**.
+  * New Milestone 6 tests: `BusinessMediaPipelineTest` (6) + `KycDocumentSecurityTest` (3).
+* **Skipped Live Infrastructure Integration Tests (3):**
+  1. `MySql8SpatialIntegrationTest::test_mysql8_srid_4326_spatial_distance_and_fulltext_indexes` (no local MySQL 8.0/Docker).
+  2. `MySql8DirectoryIntegrationTest::test_mysql8_business_location_point_srid_4326_and_fulltext_index` (no local MySQL 8.0/Docker).
+  3. `MinioS3IntegrationTest::test_live_minio_s3_public_and_private_bucket_separation` (no local MinIO/Docker running; `MEDIA_PUBLIC_DRIVER` and `MEDIA_KYC_DRIVER` default to `local` outside Docker/CI).
+* **Migrations, Style & Frontend Checks:**
+  * Clean 13-migration `migrate:fresh --seed`, `migrate:rollback --step=1`, and re-`migrate` passed.
+  * `vendor/bin/pint --test` passed; Filament check passed (`0` Filament dependencies).
+  * Frontend `tsc --noEmit` (`0` errors) and Vitest (`8 passed`).

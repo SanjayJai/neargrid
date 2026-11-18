@@ -1,5 +1,5 @@
 /**
- * Frontend TypeScript contracts matching Laravel 13 Milestone 5 Directory Resources.
+ * Frontend TypeScript contracts matching Laravel 13 Directory & Media Resources.
  * Prepared for Milestone 8 live integration; demo views remain clearly labelled until then.
  */
 
@@ -79,6 +79,64 @@ export interface PublicBusinessProfileDto {
   amenities: Array<{ slug: string; name: string; icon_name: string | null }>;
   payment_methods: Array<{ slug: string; name: string }>;
   faqs: Array<{ question: string; answer: string }>;
+  media: PublicBusinessMediaDto[];
+}
+
+export type BusinessMediaTypeDto =
+  | 'logo'
+  | 'cover'
+  | 'gallery'
+  | 'interior'
+  | 'exterior'
+  | 'product'
+  | 'menu'
+  | 'certificate';
+
+export type MediaUploadStatusDto = 'pending' | 'processing' | 'ready' | 'failed';
+
+export interface MediaVariantUrlsDto {
+  thumb: string | null;
+  card: string | null;
+  full: string | null;
+}
+
+export interface PublicBusinessMediaDto {
+  public_id: string;
+  media_type: BusinessMediaTypeDto;
+  alt_text: string | null;
+  width: number | null;
+  height: number | null;
+  sort_order: number;
+  urls: MediaVariantUrlsDto;
+}
+
+export interface OwnerBusinessMediaDto extends PublicBusinessMediaDto {
+  upload_status: MediaUploadStatusDto;
+  moderation_status: 'pending' | 'approved' | 'rejected';
+  mime_type: string;
+  file_size_bytes: number;
+  exif_stripped: boolean;
+  failure_reason: string | null;
+  processed_at: string | null;
+  created_at: string | null;
+}
+
+export interface KycDocumentDto {
+  public_id: string;
+  document_type: string;
+  upload_status: string;
+  mime_type: string;
+  file_size_bytes: number;
+  width: number | null;
+  height: number | null;
+  sha256_checksum: string;
+  created_at: string | null;
+}
+
+export interface KycSignedDownloadUrlDto {
+  download_url: string;
+  expires_at: string;
+  ttl_seconds: number;
 }
 
 export interface OwnerBusinessProfileDto {

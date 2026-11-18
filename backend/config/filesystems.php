@@ -60,6 +60,46 @@ return [
             'report' => false,
         ],
 
+        'media_public' => env('MEDIA_PUBLIC_DRIVER', 'local') === 's3'
+            ? [
+                'driver' => 's3',
+                'key' => env('AWS_ACCESS_KEY_ID'),
+                'secret' => env('AWS_SECRET_ACCESS_KEY'),
+                'region' => env('AWS_DEFAULT_REGION', 'ap-south-1'),
+                'bucket' => env('AWS_BUCKET', 'localbiz-public-media'),
+                'url' => env('MEDIA_PUBLIC_URL', env('AWS_URL')),
+                'endpoint' => env('AWS_ENDPOINT'),
+                'use_path_style_endpoint' => (bool) env('AWS_USE_PATH_STYLE_ENDPOINT', true),
+                'visibility' => 'public',
+                'throw' => true,
+            ]
+            : [
+                'driver' => 'local',
+                'root' => storage_path('app/public/media'),
+                'url' => rtrim((string) env('MEDIA_PUBLIC_URL', rtrim((string) env('APP_URL', 'http://localhost'), '/').'/storage/media'), '/'),
+                'visibility' => 'public',
+                'throw' => true,
+            ],
+
+        'kyc_private' => env('MEDIA_KYC_DRIVER', 'local') === 's3'
+            ? [
+                'driver' => 's3',
+                'key' => env('AWS_ACCESS_KEY_ID'),
+                'secret' => env('AWS_SECRET_ACCESS_KEY'),
+                'region' => env('AWS_DEFAULT_REGION', 'ap-south-1'),
+                'bucket' => env('AWS_PRIVATE_KYC_BUCKET', 'localbiz-private-kyc'),
+                'endpoint' => env('AWS_ENDPOINT'),
+                'use_path_style_endpoint' => (bool) env('AWS_USE_PATH_STYLE_ENDPOINT', true),
+                'visibility' => 'private',
+                'throw' => true,
+            ]
+            : [
+                'driver' => 'local',
+                'root' => storage_path('app/private/kyc'),
+                'visibility' => 'private',
+                'throw' => true,
+            ],
+
     ],
 
     /*

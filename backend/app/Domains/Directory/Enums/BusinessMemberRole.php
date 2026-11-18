@@ -24,6 +24,7 @@ enum BusinessMemberRole: string
                 'profile.edit',
                 'hours.edit',
                 'services.edit',
+                'media.manage',
                 'leads.manage',
                 'reviews.reply',
                 'verification.submit',
@@ -34,6 +35,7 @@ enum BusinessMemberRole: string
                 'profile.edit',
                 'hours.edit',
                 'services.edit',
+                'media.manage',
                 'leads.manage',
                 'reviews.reply',
                 'verification.submit',
@@ -43,6 +45,7 @@ enum BusinessMemberRole: string
                 'profile.edit',
                 'hours.edit',
                 'services.edit',
+                'media.manage',
             ],
             self::LeadAgent => [
                 'business.view',

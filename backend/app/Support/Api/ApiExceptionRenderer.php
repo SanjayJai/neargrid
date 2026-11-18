@@ -6,6 +6,7 @@ namespace App\Support\Api;
 
 use App\Domains\Directory\Exceptions\DirectoryException;
 use App\Domains\Identity\Exceptions\IdentityException;
+use App\Domains\Media\Exceptions\MediaException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -29,6 +30,15 @@ final class ApiExceptionRenderer
         }
 
         if ($exception instanceof DirectoryException) {
+            return ApiResponse::error(
+                code: $exception->errorCode,
+                message: $exception->getMessage(),
+                status: $exception->httpStatus,
+                details: $exception->details,
+            );
+        }
+
+        if ($exception instanceof MediaException) {
             return ApiResponse::error(
                 code: $exception->errorCode,
                 message: $exception->getMessage(),
@@ -124,6 +134,7 @@ final class ApiExceptionRenderer
     {
         return match ($status) {
             Response::HTTP_BAD_REQUEST => 'BAD_REQUEST',
+            Response::HTTP_FORBIDDEN => 'FORBIDDEN',
             Response::HTTP_CONFLICT => 'CONFLICT',
             Response::HTTP_GONE => 'GONE',
             Response::HTTP_SERVICE_UNAVAILABLE => 'SERVICE_UNAVAILABLE',
