@@ -9,15 +9,28 @@ import {
 } from '@/lib/api/public-directory';
 import { CanonicalDirectoryView } from '@/modules/customer/components/CanonicalDirectoryView';
 import {
-  buildCanonicalLocalityCategoryPath,
-  parseRawSearchParams,
-} from '@/modules/customer/lib/search-url';
+  buildOrganicItemListJsonLd,
+  evaluateCanonicalDirectorySeo,
+  resolveCategoryDisplayName,
+} from '@/modules/customer/lib/directory-seo';
+import { parseRawSearchParams, sanitizeSlug } from '@/modules/customer/lib/search-url';
 
-interface LocalityCategoryPageProps {
+/**
+ * Canonical 3-segment City + Locality + Category route:
+ * `/{city}/{locality}/{category}` (e.g. `/chennai/t-nagar/dentists`).
+ *
+ * Route segment mapping:
+ * - `params.city`     -> `citySlug`
+ * - `params.segment`  -> `localitySlug` (shared dynamic folder with 2-segment `/{city}/{segment}`)
+ * - `params.category` -> `categorySlug`
+ *
+ * Static `/{city}/business/{slug}` takes route precedence over `[segment]` in Next.js App Router.
+ */
+interface CityLocalityCategoryPageProps {
   params: {
     city: string;
-    category: string; // Locality slug in the 3-segment URL /{city}/{locality}/{category}
-    childCategory: string; // Category slug in the 3-segment URL
+    segment: string; // Locality slug in /{city}/{locality}/{category}
+    category: string; // Category slug in /{city}/{locality}/{category}
   };
   searchParams: Record<string, string | string[] | undefined>;
 }
@@ -25,26 +38,27 @@ interface LocalityCategoryPageProps {
 export async function generateMetadata({
   params,
   searchParams,
-}: LocalityCategoryPageProps): Promise<Metadata> {
-  const citySlug = params.city;
-  const localitySlug = params.category;
-  const categorySlug = params.childCategory;
+}: CityLocalityCategoryPageProps): Promise<Metadata> {
+  const citySlug = sanitizeSlug(params.city);
+  const localitySlug = sanitizeSlug(params.segment);
+  const categorySlug = sanitizeSlug(params.category);
 
-  if (localitySlug === 'business') {
-    return {};
+  if (!citySlug || !localitySlug || !categorySlug || localitySlug === 'business') {
+    return {
+      robots: { index: false, follow: false },
+    };
   }
 
   const parsed = parseRawSearchParams(searchParams);
-  parsed.city = citySlug;
-  parsed.locality = localitySlug;
-  parsed.category = categorySlug;
-
-  const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-  ).replace(/\/$/, '');
+  const queryParams = {
+    ...parsed,
+    city: citySlug,
+    locality: localitySlug,
+    category: categorySlug,
+  };
 
   const [searchRes, citiesRes, categoriesRes, localitiesRes] = await Promise.all([
-    fetchPublicSearch(parsed),
+    fetchPublicSearch(queryParams),
     fetchPublicCities(parsed.locale),
     fetchPublicCategories(parsed.locale),
     fetchPublicLocalities(citySlug, parsed.locale),
@@ -56,53 +70,50 @@ export async function generateMetadata({
   const localityName =
     localitiesRes.data?.find((l) => l.slug === localitySlug)?.name ??
     localitySlug.replace(/-/g, ' ');
-  const categoryName =
-    categoriesRes.data?.find((c) => c.slug === categorySlug)?.name ??
-    categorySlug.replace(/-/g, ' ');
+  const categoryName = resolveCategoryDisplayName(categoriesRes.data, categorySlug);
 
-  const title = `Top ${categoryName} in ${localityName}, ${cityName} | NearGrid`;
-  const description = `Find top-rated, verified ${categoryName.toLowerCase()} in ${localityName}, ${cityName}. Compare ratings, read reviews, check addresses, phone numbers, and hours on NearGrid.`;
-
-  const metaSeo = searchRes.meta?.seo;
   const totalOrganic = searchRes.meta?.counts?.total_organic ?? searchRes.data?.length ?? 0;
 
-  // Thin-page policy: <3 listings in locality-category page must be noindex per docs/12-seo-architecture.md
-  const isThinPage = totalOrganic < 3;
-  const backendRobots = metaSeo?.robots ?? (isThinPage ? 'noindex, follow' : 'index, follow');
-  const shouldIndex = !isThinPage && backendRobots.startsWith('index');
+  // Enforces <3 thin-page noindex, filter/sort noindex, and canonical normalization per docs/12-seo-architecture.md
+  const seo = evaluateCanonicalDirectorySeo({
+    pageKind: 'city_locality_category',
+    citySlug,
+    localitySlug,
+    categorySlug,
+    params: parsed,
+    apiOk: searchRes.ok,
+    totalOrganic,
+    backendSeo: searchRes.meta?.seo ?? null,
+  });
 
-  const canonicalUrl =
-    metaSeo?.canonical_url ??
-    `${siteUrl}${buildCanonicalLocalityCategoryPath(citySlug, localitySlug, categorySlug, parsed.page ?? 1)}`;
+  const title = `Top ${categoryName} in ${localityName}, ${cityName}`;
+  const description = `Find top-rated, verified ${categoryName.toLowerCase()} in ${localityName}, ${cityName}. Compare ratings, read reviews, check addresses, masked contact info, and opening hours on NearGrid.`;
 
   return {
     title,
     description,
-    robots: {
-      index: shouldIndex,
-      follow: true,
-    },
+    robots: seo.robots,
     alternates: {
-      canonical: canonicalUrl,
+      canonical: seo.canonicalUrl,
     },
     openGraph: {
       title,
       description,
-      url: canonicalUrl,
+      url: seo.canonicalUrl,
       type: 'website',
     },
   };
 }
 
-export default async function LocalityCategoryPage({
+export default async function CityLocalityCategoryPage({
   params,
   searchParams,
-}: LocalityCategoryPageProps) {
-  const citySlug = params.city;
-  const localitySlug = params.category;
-  const categorySlug = params.childCategory;
+}: CityLocalityCategoryPageProps) {
+  const citySlug = sanitizeSlug(params.city);
+  const localitySlug = sanitizeSlug(params.segment);
+  const categorySlug = sanitizeSlug(params.category);
 
-  if (localitySlug === 'business') {
+  if (!citySlug || !localitySlug || !categorySlug || localitySlug === 'business') {
     notFound();
   }
 
@@ -131,44 +142,30 @@ export default async function LocalityCategoryPage({
   const localities = localitiesRes.ok && localitiesRes.data ? localitiesRes.data : [];
 
   const matchedCity = cities.find((c) => c.slug === citySlug);
-  const cityName = matchedCity?.name ?? citySlug.charAt(0).toUpperCase() + citySlug.slice(1);
+  const cityName =
+    matchedCity?.name ?? citySlug.charAt(0).toUpperCase() + citySlug.slice(1);
 
   const matchedLocality = localities.find((l) => l.slug === localitySlug);
   const localityName = matchedLocality?.name ?? localitySlug.replace(/-/g, ' ');
 
-  const matchedCategory = categories.find((c) => c.slug === categorySlug);
-  const categoryName = matchedCategory?.name ?? categorySlug.replace(/-/g, ' ');
+  const categoryName = resolveCategoryDisplayName(categories, categorySlug);
 
-  const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-  ).replace(/\/$/, '');
   const baseCanonicalPath = `/${encodeURIComponent(citySlug)}/${encodeURIComponent(localitySlug)}/${encodeURIComponent(categorySlug)}`;
+  const currentPage = meta?.pagination?.current_page ?? parsedParams.page ?? 1;
 
+  // Breadcrumb hierarchy per docs/12-seo-architecture.md: Home -> City -> Locality -> Category
   const breadcrumbs = [
     { label: 'Home', href: '/' },
     { label: cityName, href: `/search?city=${encodeURIComponent(citySlug)}` },
     {
-      label: categoryName,
-      href: `/${encodeURIComponent(citySlug)}/${encodeURIComponent(categorySlug)}`,
+      label: localityName,
+      href: `/search?city=${encodeURIComponent(citySlug)}&locality=${encodeURIComponent(localitySlug)}`,
     },
-    { label: localityName },
+    { label: categoryName, href: baseCanonicalPath },
   ];
 
-  // Schema.org ItemList JSON-LD for top organic listings on Page 1
-  const organicHits = hits.filter((h) => !h.is_sponsored).slice(0, 10);
-  const itemListJsonLd =
-    organicHits.length > 0
-      ? {
-          '@context': 'https://schema.org',
-          '@type': 'ItemList',
-          itemListElement: organicHits.map((h, i) => ({
-            '@type': 'ListItem',
-            position: i + 1,
-            name: h.name,
-            url: `${siteUrl}/${encodeURIComponent(h.city_slug ?? citySlug)}/business/${encodeURIComponent(h.slug)}`,
-          })),
-        }
-      : null;
+  // Schema.org ItemList JSON-LD for Page 1 organic listings only
+  const itemListJsonLd = buildOrganicItemListJsonLd(hits, citySlug, currentPage);
 
   return (
     <>

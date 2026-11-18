@@ -14,12 +14,28 @@ import {
 } from 'lucide-react';
 import type { SearchQueryParams, SearchSortOptionDto } from '@/shared/api/directory-types';
 
+export const SUPPORTED_SORT_OPTIONS: ReadonlyArray<{
+  value: SearchSortOptionDto;
+  label: string;
+}> = [
+  { value: 'relevance', label: 'Relevance' },
+  { value: 'rating', label: 'Highest Rated' },
+  { value: 'distance', label: 'Nearest First' },
+  { value: 'popularity', label: 'Most Popular' },
+  { value: 'newest', label: 'Newest' },
+];
+
+const SUPPORTED_SORT_VALUES = new Set<SearchSortOptionDto>(
+  SUPPORTED_SORT_OPTIONS.map((opt) => opt.value)
+);
+
 interface QuickFilterBarProps {
   currentParams: SearchQueryParams;
   onFilterChange: (patch: Partial<SearchQueryParams>) => void;
   onResetFilters: () => void;
   onOpenMobileFilters?: () => void;
   hasActiveFilters?: boolean;
+  sortOptions?: Array<{ value: SearchSortOptionDto; label: string }>;
 }
 
 export function QuickFilterBar({
@@ -28,9 +44,15 @@ export function QuickFilterBar({
   onResetFilters,
   onOpenMobileFilters,
   hasActiveFilters = false,
+  sortOptions,
 }: QuickFilterBarProps) {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+
+  const resolvedSortOptions =
+    sortOptions && sortOptions.length > 0
+      ? sortOptions.filter((opt) => SUPPORTED_SORT_VALUES.has(opt.value))
+      : SUPPORTED_SORT_OPTIONS;
 
   const activeSort = currentParams.sort ?? 'relevance';
   const isTopRated = (currentParams.min_rating ?? 0) >= 4;
@@ -233,11 +255,11 @@ export function QuickFilterBar({
             }
             className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-ink shadow-2xs focus:border-brand-500 focus:outline-none"
           >
-            <option value="relevance">Relevance</option>
-            <option value="rating">Highest Rated</option>
-            <option value="distance">Nearest First</option>
-            <option value="popularity">Most Popular</option>
-            <option value="newest">Recently Added</option>
+            {resolvedSortOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>

@@ -15,6 +15,7 @@ import { EmptyState, ErrorState } from '@/shared/ui/StateFeedback';
 import {
   buildShareableSearchUrl,
   parseRawSearchParams,
+  urlSearchParamsToRecord,
 } from '@/modules/customer/lib/search-url';
 import { DirectoryListingCard } from './DirectoryListingCard';
 import { QuickFilterBar } from './QuickFilterBar';
@@ -50,8 +51,8 @@ export function SearchResultsClient({
   const abortControllerRef = useRef<AbortController | null>(null);
   const isInitialMount = useRef(true);
 
-  // Compute current params from the active URL searchParams
-  const rawParamsRecord = Object.fromEntries(searchParams.entries());
+  // Compute current params from the active URL searchParams (preserving multi-value keys)
+  const rawParamsRecord = urlSearchParamsToRecord(searchParams);
   const currentParams = parseRawSearchParams(rawParamsRecord);
 
   // Keep fallback city if none in URL
@@ -122,7 +123,7 @@ export function SearchResultsClient({
       isInitialMount.current = false;
       return;
     }
-    const parsed = parseRawSearchParams(Object.fromEntries(searchParams.entries()));
+    const parsed = parseRawSearchParams(urlSearchParamsToRecord(searchParams));
     if (!parsed.city && initialParams.city) parsed.city = initialParams.city;
     fetchResults(parsed);
   }, [searchParams, fetchResults, initialParams.city]);
@@ -251,6 +252,7 @@ export function SearchResultsClient({
             onResetFilters={handleResetFilters}
             onOpenMobileFilters={() => setMobileFiltersOpen(true)}
             hasActiveFilters={hasActiveFilters}
+            sortOptions={filtersData?.sort_options}
           />
 
           {/* Results State */}

@@ -22,10 +22,11 @@ interface DirectoryListingCardProps {
 /**
  * Dense, Justdial-style horizontal directory business card.
  * Backed 100% by live SearchBusinessHitDto from Laravel 13 MySQL 8.0 FullText & Spatial engine.
+ * Preserves contact privacy: displays masked phone and WhatsApp availability without exposing
+ * private contact numbers or implying unsupported contact-reveal flows.
  */
 export function DirectoryListingCard({ hit, priority = false }: DirectoryListingCardProps) {
   const [enquiryOpen, setEnquiryOpen] = useState(false);
-  const [phoneRevealed, setPhoneRevealed] = useState(false);
 
   const citySlug = hit.city_slug ?? 'chennai';
   const profileHref = `/${encodeURIComponent(citySlug)}/business/${encodeURIComponent(hit.slug)}`;
@@ -36,9 +37,20 @@ export function DirectoryListingCard({ hit, priority = false }: DirectoryListing
     hit.media_preview[0]?.urls.full ??
     null;
 
-  function handlePhoneClick() {
-    setPhoneRevealed(true);
+  // SearchBusinessHitResource already embeds locality_name in address_short; avoid duplicating it.
+  const addressParts: string[] = [];
+  if (hit.address_short) {
+    addressParts.push(hit.address_short);
+  } else if (hit.locality_name) {
+    addressParts.push(hit.locality_name);
   }
+  if (
+    hit.city_name &&
+    !addressParts.join(', ').toLowerCase().includes(hit.city_name.toLowerCase())
+  ) {
+    addressParts.push(hit.city_name);
+  }
+  const formattedAddress = addressParts.join(', ');
 
   return (
     <>
@@ -100,9 +112,7 @@ export function DirectoryListingCard({ hit, priority = false }: DirectoryListing
                 aria-hidden="true"
               />
               <span className="line-clamp-1">
-                {hit.address_short}
-                {hit.locality_name ? `, ${hit.locality_name}` : ''}
-                {hit.city_name ? `, ${hit.city_name}` : ''}
+                {formattedAddress}
                 {hit.distance_km !== null && hit.distance_km !== undefined ? (
                   <strong className="ml-1 font-semibold text-signal-700">
                     · {hit.distance_km.toFixed(1)} km away
@@ -134,31 +144,31 @@ export function DirectoryListingCard({ hit, priority = false }: DirectoryListing
           {/* Action strip */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 pt-3">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Phone call / masked reveal action */}
-              <button
-                type="button"
-                onClick={handlePhoneClick}
-                title="Click to view contact number"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-trust-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-trust-800 transition-colors"
-              >
-                <Phone className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>{phoneRevealed ? hit.phone_masked : hit.phone_masked}</span>
-              </button>
-
-              {/* WhatsApp button */}
-              {hit.has_whatsapp && (
-                <a
-                  href={`https://wa.me/?text=Hello%20${encodeURIComponent(hit.name)},%20I%20found%20your%20business%20on%20NearGrid`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg border border-trust-600/30 bg-trust-50 px-2.5 py-1.5 text-xs font-semibold text-trust-800 hover:bg-trust-100 transition-colors"
+              {/* Privacy-masked phone badge (non-interactive; no raw number exposed) */}
+              {hit.phone_masked && (
+                <span
+                  aria-label={`Masked phone number: ${hit.phone_masked}`}
+                  title="Contact number masked for privacy"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-trust-700 px-3 py-1.5 text-xs font-semibold text-white"
                 >
-                  <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>WhatsApp</span>
-                </a>
+                  <Phone className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>{hit.phone_masked}</span>
+                </span>
               )}
 
-              {/* Send Enquiry CTA button */}
+              {/* WhatsApp availability badge (non-interactive; private number never exposed) */}
+              {hit.has_whatsapp && (
+                <span
+                  aria-label="WhatsApp available"
+                  title="This business supports WhatsApp contact"
+                  className="inline-flex items-center gap-1 rounded-lg border border-trust-600/30 bg-trust-50 px-2.5 py-1.5 text-xs font-semibold text-trust-800"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>WhatsApp Available</span>
+                </span>
+              )}
+
+              {/* Enquiry status dialog CTA */}
               <button
                 type="button"
                 onClick={() => setEnquiryOpen(true)}
@@ -181,12 +191,12 @@ export function DirectoryListingCard({ hit, priority = false }: DirectoryListing
         </div>
       </article>
 
-      {/* Enquiry Modal */}
+      {/* Honest Phase 3C Enquiry Feature Status Dialog */}
       <EnquiryModal
         isOpen={enquiryOpen}
         onClose={() => setEnquiryOpen(false)}
         businessName={hit.name}
-        businessPublicId={hit.public_id}
+        profileHref={profileHref}
         phoneMasked={hit.phone_masked}
       />
     </>

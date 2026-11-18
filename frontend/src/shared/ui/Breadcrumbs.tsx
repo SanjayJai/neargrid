@@ -11,33 +11,43 @@ interface BreadcrumbsProps {
   className?: string;
 }
 
+export function buildBreadcrumbListJsonLd(
+  items: BreadcrumbItem[],
+  siteUrl?: string
+): Record<string, unknown> {
+  const normalizedSiteUrl = (
+    siteUrl ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    'http://localhost:3000'
+  ).replace(/\/$/, '');
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => {
+      const entry: Record<string, unknown> = {
+        '@type': 'ListItem',
+        position: index + 1,
+        name: item.label,
+      };
+
+      if (item.href) {
+        entry.item = item.href.startsWith('http')
+          ? item.href
+          : `${normalizedSiteUrl}${item.href.startsWith('/') ? '' : '/'}${item.href}`;
+      }
+
+      return entry;
+    }),
+  };
+}
+
 /**
  * Accessible Breadcrumb navigation with automated Schema.org BreadcrumbList JSON-LD.
  * Conforms to docs/12-seo-architecture.md.
  */
 export function Breadcrumbs({ items, className = '' }: BreadcrumbsProps) {
-  const siteUrl = (
-    process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
-  ).replace(/\/$/, '');
-
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: items.map((item, index) => {
-      const fullUrl = item.href
-        ? item.href.startsWith('http')
-          ? item.href
-          : `${siteUrl}${item.href.startsWith('/') ? '' : '/'}${item.href}`
-        : `${siteUrl}/`;
-
-      return {
-        '@type': 'ListItem',
-        position: index + 1,
-        name: item.label,
-        item: fullUrl,
-      };
-    }),
-  };
+  const jsonLd = buildBreadcrumbListJsonLd(items);
 
   return (
     <>

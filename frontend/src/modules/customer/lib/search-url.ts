@@ -103,7 +103,7 @@ export function buildShareableSearchUrl(input: ShareableSearchUrlInput): string 
     params.set('lat', Number(lat).toFixed(6));
     params.set('lng', Number(lng).toFixed(6));
     const r = input.radiusKm ?? input.radius_km;
-    if (typeof r === 'number' && r >= 0.5 && r <= 100) {
+    if (typeof r === 'number' && r >= 0.5 && r <= 50) {
       params.set('radius_km', String(r));
     }
   }
@@ -195,7 +195,7 @@ export function parseRawSearchParams(
   const lng = hasCoords ? lngRaw : undefined;
 
   const radiusRaw = parseFloat(getSingle('radius_km') ?? '');
-  const radius_km = Number.isFinite(radiusRaw) && radiusRaw >= 0.5 && radiusRaw <= 100 ? radiusRaw : undefined;
+  const radius_km = Number.isFinite(radiusRaw) && radiusRaw >= 0.5 && radiusRaw <= 50 ? radiusRaw : undefined;
 
   const minRatingRaw = parseFloat(getSingle('min_rating') ?? '');
   const min_rating =
@@ -278,4 +278,25 @@ export function buildCanonicalLocalityCategoryPath(
     return `/${cleanCity}/${cleanLoc}/${cleanCat}`;
   }
   return `/${cleanCity}/${cleanLoc}/${cleanCat}?page=${page}`;
+}
+
+/**
+ * Converts URLSearchParams (preserving repeated array keys like localities[] / amenities[])
+ * into the Record shape accepted by parseRawSearchParams.
+ */
+export function urlSearchParamsToRecord(
+  params: Pick<URLSearchParams, 'forEach'>
+): Record<string, string | string[]> {
+  const record: Record<string, string | string[]> = {};
+  params.forEach((value, key) => {
+    const existing = record[key];
+    if (existing === undefined) {
+      record[key] = value;
+    } else if (Array.isArray(existing)) {
+      existing.push(value);
+    } else {
+      record[key] = [existing, value];
+    }
+  });
+  return record;
 }

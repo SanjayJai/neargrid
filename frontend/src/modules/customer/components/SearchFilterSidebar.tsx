@@ -80,8 +80,8 @@ export function SearchFilterSidebar({
 
   const filterContent = (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+      {/* Top Header (desktop sidebar only; mobile drawer renders its own header & reset footer) */}
+      <div className="hidden lg:flex items-center justify-between border-b border-gray-200 pb-3">
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-brand-600" aria-hidden="true" />
           <h2 className="text-sm font-bold text-ink">Filters</h2>
@@ -357,8 +357,8 @@ export function SearchFilterSidebar({
         </div>
       </div>
 
-      {/* Distance / Radius (when coordinates or locality active) */}
-      {(hasCoordinates || Boolean(activeLocality)) && (
+      {/* Distance / Radius (enforced by Laravel spatial query only when GPS coordinates are active) */}
+      {hasCoordinates && (
         <div className="space-y-2 border-t border-gray-100 pt-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-ink-muted flex items-center gap-1">
             <Crosshair className="h-3 w-3 text-signal-600" aria-hidden="true" />
@@ -405,6 +405,9 @@ export function SearchFilterSidebar({
           aria-modal="true"
           aria-labelledby="mobile-filters-heading"
           className="fixed inset-0 z-50 flex lg:hidden bg-black/60 backdrop-blur-xs"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onCloseMobile?.();
+          }}
         >
           <div className="relative ml-auto flex h-full w-full max-w-xs flex-col bg-white shadow-xl animate-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">

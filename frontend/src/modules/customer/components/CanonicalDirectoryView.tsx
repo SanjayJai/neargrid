@@ -96,6 +96,10 @@ export function CanonicalDirectoryView({
     const page = patch.page !== undefined ? patch.page : 1;
     if (page > 1) nextParams.set('page', String(page));
 
+    if (currentParams.locale && currentParams.locale !== 'en') {
+      nextParams.set('locale', currentParams.locale);
+    }
+
     const qs = nextParams.toString();
     const targetUrl = qs ? `${baseCanonicalPath}?${qs}` : baseCanonicalPath;
 
@@ -105,8 +109,12 @@ export function CanonicalDirectoryView({
   }
 
   function handleResetFilters() {
+    const resetTarget =
+      currentParams.locale && currentParams.locale !== 'en'
+        ? `${baseCanonicalPath}?locale=${encodeURIComponent(currentParams.locale)}`
+        : baseCanonicalPath;
     startTransition(() => {
-      router.push(baseCanonicalPath, { scroll: false });
+      router.push(resetTarget, { scroll: false });
     });
   }
 
@@ -118,7 +126,7 @@ export function CanonicalDirectoryView({
     if (currentParams.verified_only) nextParams.set('verified_only', '1');
     if (currentParams.open_now) nextParams.set('open_now', '1');
     if (currentParams.sort && currentParams.sort !== 'relevance') nextParams.set('sort', currentParams.sort);
-    if (currentParams.lat && currentParams.lng) {
+    if (currentParams.lat !== undefined && currentParams.lng !== undefined) {
       nextParams.set('lat', currentParams.lat.toFixed(6));
       nextParams.set('lng', currentParams.lng.toFixed(6));
       if (currentParams.radius_km) nextParams.set('radius_km', String(currentParams.radius_km));
@@ -126,6 +134,10 @@ export function CanonicalDirectoryView({
 
     if (targetPage > 1) {
       nextParams.set('page', String(targetPage));
+    }
+
+    if (currentParams.locale && currentParams.locale !== 'en') {
+      nextParams.set('locale', currentParams.locale);
     }
 
     const qs = nextParams.toString();
@@ -138,6 +150,9 @@ export function CanonicalDirectoryView({
     : `Best ${categoryName} in ${cityName}`;
 
   const localities = filtersData?.localities ?? [];
+  const crossLinkLocalities = localities
+    .filter((loc) => loc.slug !== localitySlug && loc.active_listing_count > 0)
+    .slice(0, 12);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
@@ -182,6 +197,7 @@ export function CanonicalDirectoryView({
             onResetFilters={handleResetFilters}
             onOpenMobileFilters={() => setMobileFiltersOpen(true)}
             hasActiveFilters={hasActiveFilters}
+            sortOptions={filtersData?.sort_options}
           />
 
           {/* Results State */}
@@ -241,7 +257,7 @@ export function CanonicalDirectoryView({
           )}
 
           {/* Locality Cross-linking Mesh (per docs/12-seo-architecture.md) */}
-          {localities.length > 0 && (
+          {(crossLinkLocalities.length > 0 || Boolean(localityName)) && (
             <div className="mt-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
               <h2 className="text-sm font-bold text-ink flex items-center gap-1.5">
                 <MapPin className="h-4 w-4 text-signal-600" aria-hidden="true" />
@@ -260,19 +276,16 @@ export function CanonicalDirectoryView({
                     All {cityName}
                   </Link>
                 )}
-                {localities
-                  .filter((loc) => loc.slug !== localitySlug && loc.active_listing_count > 0)
-                  .slice(0, 12)
-                  .map((loc) => (
-                    <Link
-                      key={loc.slug}
-                      href={`/${encodeURIComponent(citySlug)}/${encodeURIComponent(loc.slug)}/${encodeURIComponent(categorySlug)}`}
-                      className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-ink hover:border-brand-400 hover:text-brand-700 hover:bg-white transition-colors"
-                    >
-                      <span>{loc.name}</span>
-                      <span className="ml-1 text-[10px] text-ink-muted">({loc.active_listing_count})</span>
-                    </Link>
-                  ))}
+                {crossLinkLocalities.map((loc) => (
+                  <Link
+                    key={loc.slug}
+                    href={`/${encodeURIComponent(citySlug)}/${encodeURIComponent(loc.slug)}/${encodeURIComponent(categorySlug)}`}
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-ink hover:border-brand-400 hover:text-brand-700 hover:bg-white transition-colors"
+                  >
+                    <span>{loc.name}</span>
+                    <span className="ml-1 text-[10px] text-ink-muted">({loc.active_listing_count})</span>
+                  </Link>
+                ))}
               </div>
             </div>
           )}

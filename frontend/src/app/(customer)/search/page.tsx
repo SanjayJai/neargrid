@@ -6,7 +6,8 @@ import {
 } from '@/lib/api/public-directory';
 import { SearchResultsClient } from '@/modules/customer/components/SearchResultsClient';
 import {
-  buildShareableSearchUrl,
+  buildCanonicalCategoryPath,
+  buildCanonicalLocalityCategoryPath,
   parseRawSearchParams,
 } from '@/modules/customer/lib/search-url';
 
@@ -23,13 +24,26 @@ export async function generateMetadata({
     process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
   ).replace(/\/$/, '');
 
+  const cityLabel = city.charAt(0).toUpperCase() + city.slice(1);
   const title = parsed.q
-    ? `Search "${parsed.q}" in ${city.charAt(0).toUpperCase() + city.slice(1)} | NearGrid`
+    ? `Search "${parsed.q}" in ${cityLabel}`
     : parsed.category
-      ? `${parsed.category.replace(/-/g, ' ')} in ${city.charAt(0).toUpperCase() + city.slice(1)} | NearGrid`
-      : `Search Local Businesses in ${city.charAt(0).toUpperCase() + city.slice(1)} | NearGrid`;
+      ? `${parsed.category.replace(/-/g, ' ')} in ${cityLabel}`
+      : `Search Local Businesses in ${cityLabel}`;
 
-  const canonicalPath = buildShareableSearchUrl(parsed);
+  // Per docs/12-seo-architecture.md: strip filter/tracking query params from canonical.
+  // Point bare city+category(/locality) search views to their canonical directory URL; otherwise /search.
+  let canonicalPath = '/search';
+  if (!parsed.q && parsed.city && parsed.category && parsed.locality) {
+    canonicalPath = buildCanonicalLocalityCategoryPath(
+      parsed.city,
+      parsed.locality,
+      parsed.category,
+      1
+    );
+  } else if (!parsed.q && parsed.city && parsed.category) {
+    canonicalPath = buildCanonicalCategoryPath(parsed.city, parsed.category, 1);
+  }
 
   return {
     title,
