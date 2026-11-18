@@ -8,6 +8,7 @@ interface FallbackImageProps {
   alt: string;
   className?: string;
   fallbackLabel?: string;
+  priority?: boolean;
 }
 
 /**
@@ -18,6 +19,7 @@ export function FallbackImage({
   alt,
   className = 'h-full w-full object-cover',
   fallbackLabel,
+  priority = false,
 }: FallbackImageProps) {
   const [failed, setFailed] = useState(false);
 
@@ -43,8 +45,9 @@ export function FallbackImage({
     <img
       src={src}
       alt={alt}
-      loading="lazy"
+      loading={priority ? 'eager' : 'lazy'}
       decoding="async"
+      fetchPriority={priority ? 'high' : 'auto'}
       onError={() => setFailed(true)}
       className={className}
     />

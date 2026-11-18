@@ -1,220 +1,307 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { bffFetch } from '@/shared/api/bff-client';
+import type {
+  SearchBusinessHitDto,
+  SearchFiltersDataDto,
+  SearchQueryParams,
+  SearchResponseMetaDto,
+} from '@/shared/api/directory-types';
+import { Breadcrumbs } from '@/shared/ui/Breadcrumbs';
+import { DirectoryCardSkeleton } from '@/shared/ui/Skeletons';
+import { EmptyState, ErrorState } from '@/shared/ui/StateFeedback';
 import {
-  DEMO_BUSINESSES,
-  DEMO_CATEGORIES,
-  DEMO_CITIES,
-} from '@/shared/data/demo-directory';
-import { DemoBanner } from '@/shared/ui/DemoBanner';
-import { BusinessCard } from './BusinessCard';
-import { HeroSearchForm } from './HeroSearchForm';
+  buildShareableSearchUrl,
+  parseRawSearchParams,
+} from '@/modules/customer/lib/search-url';
+import { DirectoryListingCard } from './DirectoryListingCard';
+import { QuickFilterBar } from './QuickFilterBar';
+import { SearchFilterSidebar } from './SearchFilterSidebar';
+import { SearchPagination } from './SearchPagination';
 
 interface SearchResultsClientProps {
-  initialCity: string;
-  initialQuery: string;
-  initialCategory: string;
+  initialHits: SearchBusinessHitDto[];
+  initialMeta: SearchResponseMetaDto | null;
+  initialFiltersData: SearchFiltersDataDto | null;
+  initialParams: SearchQueryParams;
+  cityDisplayName?: string;
 }
 
 export function SearchResultsClient({
-  initialCity,
-  initialQuery,
-  initialCategory,
+  initialHits,
+  initialMeta,
+  initialFiltersData,
+  initialParams,
+  cityDisplayName,
 }: SearchResultsClientProps) {
-  const [category, setCategory] = useState(initialCategory);
-  const [minRating, setMinRating] = useState<number>(0);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [openNow, setOpenNow] = useState(false);
-  const [sortBy, setSortBy] = useState<'relevance' | 'rating' | 'distance'>('relevance');
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
 
-  const activeCity = DEMO_CITIES.find((c) => c.slug === initialCity) ?? DEMO_CITIES[0];
+  const [hits, setHits] = useState<SearchBusinessHitDto[]>(initialHits);
+  const [meta, setMeta] = useState<SearchResponseMetaDto | null>(initialMeta);
+  const filtersData = initialFiltersData;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  const filteredBusinesses = useMemo(() => {
-    const q = initialQuery.trim().toLowerCase();
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isInitialMount = useRef(true);
 
-    const matches = DEMO_BUSINESSES.filter((biz) => {
-      if (category && biz.categorySlug !== category) return false;
-      if (verifiedOnly && !biz.isVerified) return false;
-      if (openNow && !biz.isOpenNow) return false;
-      if (minRating > 0 && biz.ratingAvg < minRating) return false;
-      if (q) {
-        const haystack = `${biz.name} ${biz.tagline} ${biz.categoryName} ${biz.localityName} ${biz.description}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
+  // Compute current params from the active URL searchParams
+  const rawParamsRecord = Object.fromEntries(searchParams.entries());
+  const currentParams = parseRawSearchParams(rawParamsRecord);
 
-    return [...matches].sort((a, b) => {
-      if (sortBy === 'rating') return b.ratingAvg - a.ratingAvg;
-      if (sortBy === 'distance') return a.distanceKm - b.distanceKm;
-      if (a.isSponsored !== b.isSponsored) return a.isSponsored ? -1 : 1;
-      return b.ratingAvg - a.ratingAvg;
-    });
-  }, [category, initialQuery, minRating, openNow, sortBy, verifiedOnly]);
-
-  function resetFilters() {
-    setCategory('');
-    setMinRating(0);
-    setVerifiedOnly(false);
-    setOpenNow(false);
-    setSortBy('relevance');
+  // Keep fallback city if none in URL
+  if (!currentParams.city && initialParams.city) {
+    currentParams.city = initialParams.city;
   }
 
+  const activeCityName =
+    cityDisplayName ||
+    filtersData?.cities.find((c) => c.slug === currentParams.city)?.name ||
+    currentParams.city ||
+    'Chennai';
+
+  const hasActiveFilters = Boolean(
+    currentParams.locality ||
+    currentParams.category ||
+    currentParams.min_rating ||
+    currentParams.verified_only ||
+    currentParams.open_now ||
+    currentParams.lat ||
+    (currentParams.sort && currentParams.sort !== 'relevance')
+  );
+
+  // Fetch results when searchParams change (supports browser back/forward)
+  const fetchResults = useCallback(
+    async (params: SearchQueryParams) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const qs = buildShareableSearchUrl({
+          ...params,
+        }).replace('/search', '');
+
+        const url = `/api/public/search${qs}`;
+        const res = await bffFetch<SearchBusinessHitDto[]>(url, {
+          signal: controller.signal,
+        });
+
+        if (res.ok && res.payload && res.payload.status === 'success') {
+          setHits(res.payload.data ?? []);
+          setMeta((res.payload.meta as SearchResponseMetaDto) ?? null);
+        } else {
+          const msg =
+            (res.payload && res.payload.status === 'error' && res.payload.error.message) ||
+            'Failed to load search results. Please try again.';
+          setError(msg);
+        }
+      } catch (err: unknown) {
+        if ((err as Error)?.name === 'AbortError') return;
+        setError('Network error while searching businesses. Please check your connection.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // Watch searchParams for back/forward browser navigation
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const parsed = parseRawSearchParams(Object.fromEntries(searchParams.entries()));
+    if (!parsed.city && initialParams.city) parsed.city = initialParams.city;
+    fetchResults(parsed);
+  }, [searchParams, fetchResults, initialParams.city]);
+
+  // Navigate & update URL
+  const updateParamsAndUrl = (patch: Partial<SearchQueryParams>) => {
+    const nextParams: SearchQueryParams = {
+      ...currentParams,
+      ...patch,
+    };
+
+    // If changing filters (other than page), reset page to 1
+    if (!('page' in patch)) {
+      nextParams.page = 1;
+    }
+
+    const nextUrl = buildShareableSearchUrl({
+      city: nextParams.city,
+      locality: nextParams.locality,
+      localities: nextParams.localities,
+      category: nextParams.category,
+      q: nextParams.q,
+      lat: nextParams.lat,
+      lng: nextParams.lng,
+      radius_km: nextParams.radius_km,
+      min_rating: nextParams.min_rating,
+      verified_only: nextParams.verified_only,
+      open_now: nextParams.open_now,
+      sort: nextParams.sort,
+      page: nextParams.page,
+      locale: nextParams.locale,
+    });
+
+    startTransition(() => {
+      router.push(nextUrl, { scroll: false });
+    });
+  };
+
+  const handleResetFilters = () => {
+    updateParamsAndUrl({
+      locality: undefined,
+      category: undefined,
+      localities: undefined,
+      min_rating: undefined,
+      verified_only: undefined,
+      open_now: undefined,
+      lat: undefined,
+      lng: undefined,
+      radius_km: undefined,
+      sort: 'relevance',
+      page: 1,
+    });
+  };
+
+  // Build page link for SSR pagination
+  const buildPageHref = (page: number) => {
+    return buildShareableSearchUrl({
+      ...currentParams,
+      page,
+    });
+  };
+
+  const totalResults = meta?.counts?.total_organic ?? hits.length;
+  const sponsoredCount = meta?.counts?.sponsored_count ?? 0;
+  const currentPage = meta?.pagination?.current_page ?? currentParams.page ?? 1;
+  const totalPages = meta?.pagination?.last_page ?? 1;
+
+  // Title generation
+  const pageTitle = currentParams.q
+    ? `Results for "${currentParams.q}" in ${activeCityName}`
+    : currentParams.category
+      ? `${currentParams.category.replace(/-/g, ' ')} in ${activeCityName}`
+      : `Businesses in ${activeCityName}`;
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-6">
-        <HeroSearchForm initialCity={activeCity.slug} initialQuery={initialQuery} />
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+      {/* Breadcrumbs */}
+      <div className="mb-4">
+        <Breadcrumbs
+          items={[
+            { label: 'Home', href: '/' },
+            { label: activeCityName, href: `/search?city=${encodeURIComponent(currentParams.city || 'chennai')}` },
+            { label: currentParams.q ? `Search: ${currentParams.q}` : 'Search Results' },
+          ]}
+        />
       </div>
 
-      <div className="mb-6">
-        <DemoBanner description="Search results below are filtered client-side from fictional demo fixtures. Live MySQL 8.0 Spatial + English/Tamil FullText search (/api/v1/search) will connect in Phase 3B." />
-      </div>
-
-      <div className="mb-6 flex flex-col justify-between gap-4 border-b border-zinc-200 pb-4 sm:flex-row sm:items-center">
+      {/* Search Header Banner */}
+      <div className="mb-4 flex flex-col justify-between gap-2 border-b border-gray-200 pb-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
-            {initialQuery
-              ? `Results for “${initialQuery}” in ${activeCity.name}`
-              : category
-                ? `${DEMO_CATEGORIES.find((c) => c.slug === category)?.name ?? category} in ${activeCity.name}`
-                : `Local Businesses in ${activeCity.name}`}
+          <h1 className="text-xl sm:text-2xl font-bold capitalize text-ink">
+            {pageTitle}
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            Showing {filteredBusinesses.length} demo listing
-            {filteredBusinesses.length === 1 ? '' : 's'}
+          <p className="mt-0.5 text-xs text-ink-muted">
+            {loading ? (
+              'Searching verified directory...'
+            ) : (
+              <>
+                Showing <strong className="text-ink">{totalResults}</strong> verified business
+                {totalResults === 1 ? '' : 'es'}
+                {sponsoredCount > 0 && ` (${sponsoredCount} sponsored)`}
+              </>
+            )}
           </p>
         </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setShowMobileFilters((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 lg:hidden"
-          >
-            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-            Filters
-          </button>
-
-          <label htmlFor="sort-select" className="text-xs font-medium text-zinc-500">
-            Sort by
-          </label>
-          <select
-            id="sort-select"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'relevance' | 'rating' | 'distance')}
-            className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-900"
-          >
-            <option value="relevance">Relevance</option>
-            <option value="rating">Highest Rated</option>
-            <option value="distance">Nearest First</option>
-          </select>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-        <aside
-          aria-label="Search filters"
-          className={`space-y-6 rounded-2xl border border-zinc-200 bg-white p-5 lg:col-span-3 lg:block lg:self-start ${
-            showMobileFilters ? 'block' : 'hidden'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-zinc-950">Filters</h2>
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="text-xs font-medium text-zinc-500 underline-offset-2 hover:text-zinc-950 hover:underline"
-            >
-              Reset all
-            </button>
-          </div>
+      {/* Main 2-column Layout */}
+      <div className="flex flex-col gap-6 lg:flex-row">
+        {/* Left Filter Sidebar */}
+        <SearchFilterSidebar
+          filtersData={filtersData}
+          currentParams={currentParams}
+          onFilterChange={updateParamsAndUrl}
+          onResetFilters={handleResetFilters}
+          isMobileOpen={mobileFiltersOpen}
+          onCloseMobile={() => setMobileFiltersOpen(false)}
+        />
 
-          <div>
-            <label htmlFor="filter-category" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Category
-            </label>
-            <select
-              id="filter-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950"
-            >
-              <option value="">All Categories</option>
-              {DEMO_CATEGORIES.map((cat) => (
-                <option key={cat.slug} value={cat.slug}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Right Listings Column */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* Quick Filter Bar */}
+          <QuickFilterBar
+            currentParams={currentParams}
+            onFilterChange={updateParamsAndUrl}
+            onResetFilters={handleResetFilters}
+            onOpenMobileFilters={() => setMobileFiltersOpen(true)}
+            hasActiveFilters={hasActiveFilters}
+          />
 
-          <div>
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Minimum Rating
-            </span>
-            <div className="space-y-2 text-sm">
-              {[0, 4.0, 4.5].map((threshold) => (
-                <label key={threshold} className="flex cursor-pointer items-center gap-2 text-zinc-800">
-                  <input
-                    type="radio"
-                    name="min-rating"
-                    checked={minRating === threshold}
-                    onChange={() => setMinRating(threshold)}
-                    className="h-4 w-4 accent-zinc-950"
-                  />
-                  <span>{threshold === 0 ? 'Any rating' : `${threshold.toFixed(1)}+ stars`}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2.5 border-t border-zinc-100 pt-4 text-sm">
-            <label className="flex cursor-pointer items-center gap-2 text-zinc-800">
-              <input
-                type="checkbox"
-                checked={verifiedOnly}
-                onChange={(e) => setVerifiedOnly(e.target.checked)}
-                className="h-4 w-4 rounded accent-zinc-950"
-              />
-              <span>Verified businesses only</span>
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-zinc-800">
-              <input
-                type="checkbox"
-                checked={openNow}
-                onChange={(e) => setOpenNow(e.target.checked)}
-                className="h-4 w-4 rounded accent-zinc-950"
-              />
-              <span>Open now</span>
-            </label>
-          </div>
-        </aside>
-
-        <section aria-label="Business results" className="lg:col-span-9">
-          {filteredBusinesses.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-10 text-center">
-              <h2 className="text-base font-semibold text-zinc-950">No demo listings match those filters</h2>
-              <p className="mt-1 text-sm text-zinc-600">
-                Try clearing a filter or broadening your search term.
-              </p>
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="mt-4 rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-              >
-                Clear Filters
-              </button>
-            </div>
+          {/* Results State */}
+          {loading ? (
+            <DirectoryCardSkeleton count={5} />
+          ) : error ? (
+            <ErrorState
+              title="Search Unavailable"
+              message={error}
+              onRetry={() => fetchResults(currentParams)}
+            />
+          ) : hits.length === 0 ? (
+            <EmptyState
+              title="No businesses found"
+              description={`We couldn't find any businesses matching your search in ${activeCityName}. Try broadening your keywords or removing filters.`}
+              action={
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white hover:bg-brand-700"
+                >
+                  Reset All Filters
+                </button>
+              }
+            />
           ) : (
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              {filteredBusinesses.map((biz) => (
-                <BusinessCard key={biz.publicId} business={biz} />
+            <div className="space-y-4" role="feed" aria-label="Search results list">
+              {hits.map((hit, index) => (
+                <DirectoryListingCard
+                  key={hit.public_id}
+                  hit={hit}
+                  priority={index === 0}
+                />
               ))}
             </div>
           )}
-        </section>
+
+          {/* Pagination */}
+          {!loading && hits.length > 0 && totalPages > 1 && (
+            <div className="pt-2">
+              <SearchPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalResults}
+                perPage={currentParams.per_page ?? 20}
+                buildPageHref={buildPageHref}
+                onPageChange={(p) => updateParamsAndUrl({ page: p })}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

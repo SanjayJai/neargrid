@@ -1,3 +1,5 @@
+import type { SearchQueryParams, SearchSortOptionDto } from '@/shared/api/directory-types';
+
 const SLUG_REGEX = /^[a-z0-9-]+$/;
 
 export type SupportedLocale = 'en' | 'ta';
@@ -30,15 +32,43 @@ export function isValidCoordinatePair(lat?: number | null, lng?: number | null):
   return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
 }
 
+const VALID_SORTS: ReadonlyArray<SearchSortOptionDto> = [
+  'relevance',
+  'rating',
+  'distance',
+  'popularity',
+  'newest',
+];
+
+export function sanitizeSort(raw?: string | null): SearchSortOptionDto | undefined {
+  if (!raw) return undefined;
+  const candidate = raw.trim().toLowerCase() as SearchSortOptionDto;
+  return VALID_SORTS.includes(candidate) ? candidate : undefined;
+}
+
 export interface ShareableSearchUrlInput {
   city?: string | null;
   locality?: string | null;
+  localities?: string[] | null;
   category?: string | null;
   q?: string | null;
   lat?: number | null;
   lng?: number | null;
   radiusKm?: number | null;
+  radius_km?: number | null;
+  minRating?: number | null;
+  min_rating?: number | null;
+  verifiedOnly?: boolean | null;
+  verified_only?: boolean | null;
+  openNow?: boolean | null;
+  open_now?: boolean | null;
+  amenities?: string[] | null;
+  paymentMethods?: string[] | null;
+  payment_methods?: string[] | null;
   sort?: string | null;
+  page?: number | null;
+  perPage?: number | null;
+  per_page?: number | null;
   locale?: SupportedLocale;
 }
 
@@ -58,16 +88,69 @@ export function buildShareableSearchUrl(input: ShareableSearchUrlInput): string 
   if (category) params.set('category', category);
   if (q) params.set('q', q);
 
-  if (isValidCoordinatePair(input.lat, input.lng)) {
-    params.set('lat', Number(input.lat).toFixed(6));
-    params.set('lng', Number(input.lng).toFixed(6));
-    if (typeof input.radiusKm === 'number' && input.radiusKm >= 0.5 && input.radiusKm <= 50) {
-      params.set('radius_km', String(input.radiusKm));
+  if (input.localities && Array.isArray(input.localities)) {
+    for (const loc of input.localities) {
+      const sanitized = sanitizeSlug(loc);
+      if (sanitized && sanitized !== locality) {
+        params.append('localities[]', sanitized);
+      }
     }
   }
 
-  if (input.sort && ['relevance', 'rating', 'distance', 'popularity', 'newest'].includes(input.sort)) {
-    params.set('sort', input.sort);
+  const lat = typeof input.lat === 'number' ? input.lat : undefined;
+  const lng = typeof input.lng === 'number' ? input.lng : undefined;
+  if (isValidCoordinatePair(lat, lng)) {
+    params.set('lat', Number(lat).toFixed(6));
+    params.set('lng', Number(lng).toFixed(6));
+    const r = input.radiusKm ?? input.radius_km;
+    if (typeof r === 'number' && r >= 0.5 && r <= 100) {
+      params.set('radius_km', String(r));
+    }
+  }
+
+  const minRating = input.minRating ?? input.min_rating;
+  if (typeof minRating === 'number' && minRating >= 1 && minRating <= 5) {
+    params.set('min_rating', String(minRating));
+  }
+
+  const verified = input.verifiedOnly ?? input.verified_only;
+  if (verified) {
+    params.set('verified_only', '1');
+  }
+
+  const openNow = input.openNow ?? input.open_now;
+  if (openNow) {
+    params.set('open_now', '1');
+  }
+
+  const amenities = input.amenities;
+  if (amenities && Array.isArray(amenities)) {
+    for (const a of amenities) {
+      const s = sanitizeSlug(a);
+      if (s) params.append('amenities[]', s);
+    }
+  }
+
+  const paymentMethods = input.paymentMethods ?? input.payment_methods;
+  if (paymentMethods && Array.isArray(paymentMethods)) {
+    for (const p of paymentMethods) {
+      const s = sanitizeSlug(p);
+      if (s) params.append('payment_methods[]', s);
+    }
+  }
+
+  const sort = sanitizeSort(input.sort);
+  if (sort && sort !== 'relevance') {
+    params.set('sort', sort);
+  }
+
+  if (typeof input.page === 'number' && input.page > 1) {
+    params.set('page', String(input.page));
+  }
+
+  const perPage = input.perPage ?? input.per_page;
+  if (typeof perPage === 'number' && perPage >= 1 && perPage <= 40 && perPage !== 20) {
+    params.set('per_page', String(perPage));
   }
 
   if (input.locale && input.locale !== 'en') {
@@ -76,4 +159,123 @@ export function buildShareableSearchUrl(input: ShareableSearchUrlInput): string 
 
   const query = params.toString();
   return query ? `/search?${query}` : '/search';
+}
+
+/**
+ * Parses raw Next.js URL query params into typed SearchQueryParams.
+ */
+export function parseRawSearchParams(
+  rawParams: Record<string, string | string[] | undefined>
+): SearchQueryParams {
+  const getSingle = (key: string): string | undefined => {
+    const val = rawParams[key];
+    if (Array.isArray(val)) return val[0];
+    return val;
+  };
+
+  const getArray = (key: string): string[] => {
+    const val = rawParams[key];
+    if (!val) return [];
+    if (Array.isArray(val)) return val.filter(Boolean);
+    return [val].filter(Boolean);
+  };
+
+  const city = sanitizeSlug(getSingle('city')) ?? undefined;
+  const category = sanitizeSlug(getSingle('category')) ?? undefined;
+  const locality = sanitizeSlug(getSingle('locality')) ?? undefined;
+  const q = sanitizeSearchText(getSingle('q')) || undefined;
+
+  const rawLocalities = [...getArray('localities[]'), ...getArray('localities')];
+  const localities = rawLocalities.map(sanitizeSlug).filter((x): x is string => Boolean(x));
+
+  const latRaw = parseFloat(getSingle('lat') ?? '');
+  const lngRaw = parseFloat(getSingle('lng') ?? '');
+  const hasCoords = isValidCoordinatePair(latRaw, lngRaw);
+  const lat = hasCoords ? latRaw : undefined;
+  const lng = hasCoords ? lngRaw : undefined;
+
+  const radiusRaw = parseFloat(getSingle('radius_km') ?? '');
+  const radius_km = Number.isFinite(radiusRaw) && radiusRaw >= 0.5 && radiusRaw <= 100 ? radiusRaw : undefined;
+
+  const minRatingRaw = parseFloat(getSingle('min_rating') ?? '');
+  const min_rating =
+    Number.isFinite(minRatingRaw) && minRatingRaw >= 1 && minRatingRaw <= 5 ? minRatingRaw : undefined;
+
+  const verifiedRaw = getSingle('verified_only');
+  const verified_only = verifiedRaw === '1' || verifiedRaw === 'true';
+
+  const openNowRaw = getSingle('open_now');
+  const open_now = openNowRaw === '1' || openNowRaw === 'true';
+
+  const rawAmenities = [...getArray('amenities[]'), ...getArray('amenities')];
+  const amenities = rawAmenities.map(sanitizeSlug).filter((x): x is string => Boolean(x));
+
+  const rawPayments = [...getArray('payment_methods[]'), ...getArray('payment_methods')];
+  const payment_methods = rawPayments.map(sanitizeSlug).filter((x): x is string => Boolean(x));
+
+  const sort = sanitizeSort(getSingle('sort'));
+
+  const pageRaw = parseInt(getSingle('page') ?? '1', 10);
+  const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? pageRaw : 1;
+
+  const perPageRaw = parseInt(getSingle('per_page') ?? '20', 10);
+  const per_page = Number.isFinite(perPageRaw) && perPageRaw >= 1 && perPageRaw <= 40 ? perPageRaw : 20;
+
+  const locale = normalizeLocale(getSingle('locale'));
+
+  return {
+    city,
+    category,
+    locality,
+    localities: localities.length > 0 ? localities : undefined,
+    q,
+    lat,
+    lng,
+    radius_km,
+    min_rating,
+    verified_only: verified_only || undefined,
+    open_now: open_now || undefined,
+    amenities: amenities.length > 0 ? amenities : undefined,
+    payment_methods: payment_methods.length > 0 ? payment_methods : undefined,
+    sort,
+    page,
+    per_page,
+    locale,
+  };
+}
+
+/**
+ * Builds canonical category path per docs/12-seo-architecture.md.
+ * Page 1 is always the bare path.
+ */
+export function buildCanonicalCategoryPath(
+  citySlug: string,
+  categorySlug: string,
+  page = 1
+): string {
+  const cleanCity = sanitizeSlug(citySlug) ?? 'chennai';
+  const cleanCat = sanitizeSlug(categorySlug) ?? 'all';
+  if (page <= 1) {
+    return `/${cleanCity}/${cleanCat}`;
+  }
+  return `/${cleanCity}/${cleanCat}?page=${page}`;
+}
+
+/**
+ * Builds canonical locality + category path per docs/12-seo-architecture.md.
+ * Page 1 is always the bare path.
+ */
+export function buildCanonicalLocalityCategoryPath(
+  citySlug: string,
+  localitySlug: string,
+  categorySlug: string,
+  page = 1
+): string {
+  const cleanCity = sanitizeSlug(citySlug) ?? 'chennai';
+  const cleanLoc = sanitizeSlug(localitySlug) ?? 'all';
+  const cleanCat = sanitizeSlug(categorySlug) ?? 'all';
+  if (page <= 1) {
+    return `/${cleanCity}/${cleanLoc}/${cleanCat}`;
+  }
+  return `/${cleanCity}/${cleanLoc}/${cleanCat}?page=${page}`;
 }
