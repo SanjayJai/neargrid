@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domains\Directory\Models\Business;
+use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Identity\Models\Role;
 use App\Domains\Identity\Models\UserDevice;
 use App\Support\Concerns\HasPublicUlid;
@@ -67,6 +69,22 @@ class User extends Authenticatable
     public function devices(): HasMany
     {
         return $this->hasMany(UserDevice::class);
+    }
+
+    /**
+     * @return HasMany<Business, $this>
+     */
+    public function ownedBusinesses(): HasMany
+    {
+        return $this->hasMany(Business::class, 'owner_user_id');
+    }
+
+    /**
+     * @return HasMany<BusinessMember, $this>
+     */
+    public function businessMemberships(): HasMany
+    {
+        return $this->hasMany(BusinessMember::class);
     }
 
     public function hasRole(string $roleName): bool

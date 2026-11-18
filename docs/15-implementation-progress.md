@@ -2,12 +2,12 @@
 
 ## 1. Current Status Summary
 
-* **Active Phase:** Phase 3A — Foundation & Core Platform (**ALL 4 MILESTONES COMPLETED**)
-* **Current Milestone Completed:** **Milestone 4 — Single Next.js App Router Frontend Foundation (`frontend/`) & Secure Opaque-Session BFF**
-* **Next Planned Phase:** **Phase 3B — Business Directory Core, MySQL 8.0 Spatial + English/Tamil Search Engine & Media Pipeline** (awaiting approval to proceed)
+* **Active Phase:** Phase 3B — Business Directory Core, Media, Search & Live Integration
+* **Current Milestone Completed:** **Milestone 5 — Business Directory Backend**
+* **Next Planned Milestone:** **Milestone 6 — Media Pipeline (S3/MinIO Public + Private KYC Buckets, EXIF Stripping, Responsive WebP Transcoding)** (awaiting approval to proceed)
 * **Stack Compliance Check:**
   * Backend: Laravel `v13.43.0` (PHP `8.3.36`), `laravel/sanctum v4.5.0`, `predis/predis v3.7.1`, **Zero Filament**
-  * Frontend: Single Next.js `14.2.35` (App Router) + React `18.3.1` + TypeScript `5.7.2` + Tailwind CSS `3.4.19` + `ioredis` (`(customer)` and `(business)` route groups; custom Laravel Blade admin remains strictly at `/admin`)
+  * Frontend: Single Next.js `14.2.35` (App Router) + React `18.3.1` + TypeScript `5.7.2` + Tailwind CSS `3.4.19` + `ioredis` (Demo UI preserved honestly until Milestone 8; typed Directory DTO contracts prepared in `frontend/src/shared/api/directory-types.ts`)
 
 ---
 
@@ -16,31 +16,41 @@
 | Milestone | Scope | Status | Verification Evidence | Git Commit |
 | :--- | :--- | :--- | :--- | :--- |
 | **Phase 1** | Website Discovery & Analysis (`docs/01`–`06`) | Completed | Live probes, `robots.txt` audit, REA inspection of `webfont.min.js`, 6 docs created | `b1760e5` |
-| **Phase 2** | System Architecture, ERD, API, Search, SEO, Security & Roadmap (`docs/07`–`14`) + 7 final approval updates | Completed | All 8 architecture docs updated with BFF isolation, independent Policies, English/Tamil search benchmarks, configurable privacy retention + legal exceptions, webhook idempotency/retry, SEO thin-page/sitemap parity, DB restore/RPO/RTO | `b1760e5` |
-| **Phase 3A — M1** | Project structure, Docker Compose (MySQL 8.0, Redis 7, MinIO, Mailpit), `backend/` Laravel 13 REST API foundation, standardized Flutter-compatible JSON envelopes, exception renderer, middleware, `config/privacy.php`, `config/directory.php`, `/api/v1/health`, `/api/v1/meta`, and custom Blade `/admin/health` foundation | **Completed & Verified** | `php artisan test` (SQLite): **14 passed (106 assertions)**; `vendor/bin/pint --test`: **passed** | `d739be7` |
-| **Phase 3A — M2** | Core Database Migrations (Identity, RBAC, OTP Challenges, User Devices, Geography with EN/TA translations, Categories & Subcategories with EN/TA translations & Tanglish synonyms), ULID & Spatial traits, Factories, Idempotent Reference Seeders, Isolated Non-Production `DevSampleSeeder`, and Database Constraint Tests | **Completed & Verified** | Clean `migrate:fresh --seed`, re-run `migrate`, rollback + re-migrate passed; `php artisan test` (SQLite): **23 passed (173 assertions)**; MySQL 8.0 spatial test: **1 skipped**; `vendor/bin/pint --test`: **passed** | `46fbf8e` |
-| **Phase 3A — M3** | Identity Domain: CSPRNG 6-digit OTP, HMAC-SHA256 bound to `(phone, purpose, otp)`, atomic single-use consumption, resend cooldown, attempt lockout, multi-dimensional rate limits & country allowlist, Sanctum Bearer tokens, device registration & device-scoped revocation, session management, independent Laravel Policies & live DB RBAC middleware | **Completed & Verified** | Clean migration + rollback passed; `php artisan test` (SQLite + mocked `FakeOtpSender`): **34 passed (321 assertions)**; MySQL 8.0 spatial test: **1 skipped**; `vendor/bin/pint --test`: **passed** | `e79a2b2` |
-| **Phase 3A — M4** | Single Next.js 14 (App Router) + React 18 + TypeScript + Tailwind CSS application in `frontend/` with isolated `(customer)` and `(business)` route groups, original NearGrid design system, opaque HttpOnly session cookie (`lbd_sid`) + AES-256-GCM encrypted Redis server-side session store, Origin + double-submit CSRF guards on all BFF mutations, live wiring to Laravel 13 `/api/v1/auth/*` (OTP login, account profile, devices, sessions, logout), and clearly labelled Demo Data for upcoming Directory/Search/Enquiry modules (`docs/16-frontend-architecture-and-routes.md`) | **Completed & Verified** | `npm test` (Vitest): **8 passed**; `npm run typecheck`: **0 errors**; `npm run lint`: **0 warnings/errors**; `npm run build`: **compiled 17/17 static & dynamic routes cleanly**; Live `next start` smoke test verified all 11 page routes (`200 OK`, `X-Frame-Options: DENY`, `noindex` on `/dashboard/*`) & BFF CSRF/Origin rejection (`403`) & unauth `/api/auth/me` (`401`) | *(Milestone 4 commit)* |
-| **Phase 3B** | Directory Core, MySQL 8 Spatial + FullText Search (English/Tamil), Autocomplete, Business Profiles & Media Pipeline | Pending | Not started | — |
-| **Phase 3C** | Privacy-Compliant Enquiries, Reviews & Business Owner Dashboard live API integration | Pending | Not started | — |
-| **Phase 3D** | Custom Laravel Blade Admin Dashboard (Session Guard, TOTP 2FA, KYC Queue, Moderation, Audit Logs) | Pending | Not started | — |
-| **Phase 3E** | Payment Integration (Webhooks + Idempotency + Invoices), Sponsored Placements, Sitemaps & Production Hardening | Pending | Not started | — |
+| **Phase 2** | System Architecture, ERD, API, Search, SEO, Security & Roadmap (`docs/07`–`14`) + 7 final approval updates | Completed | All 8 architecture docs updated | `b1760e5` |
+| **Phase 3A — M1** | Project structure, Docker Compose (MySQL 8.0, Redis 7, MinIO, Mailpit), `backend/` Laravel 13 REST API foundation, envelopes, exception renderer, middleware, `config/privacy.php`, `/api/v1/health`, `/api/v1/meta`, Blade `/admin/health` | **Completed & Verified** | SQLite tests: **14 passed (106 assertions)**; Pint: **passed** | `d739be7` |
+| **Phase 3A — M2** | Core Database Migrations (Identity, RBAC, OTP, Devices, Geography & Categories with EN/TA translations), Factories, Idempotent Reference Seeders, Isolated `DevSampleSeeder` | **Completed & Verified** | SQLite tests: **23 passed (173 assertions)**; MySQL 8.0 skipped: **1**; Pint: **passed** | `46fbf8e` |
+| **Phase 3A — M3** | Identity Domain: CSPRNG OTP, HMAC-SHA256, atomic single-use consumption, cooldown/rate limits, Sanctum Bearer tokens, device & session revocation, independent Laravel Policies & live DB RBAC middleware | **Completed & Verified** | SQLite tests: **34 passed (321 assertions)**; MySQL 8.0 skipped: **1**; Pint: **passed** | `e79a2b2` |
+| **Phase 3A — M4** | Single Next.js 14 + React 18 + Tailwind app (`frontend/`) with `(customer)` & `(business)` route groups, NearGrid UI, opaque HttpOnly BFF cookie + AES-256-GCM Redis session store, Origin + CSRF guards, live Auth/Settings wiring, Demo views (`docs/16`) | **Completed & Verified** | Vitest: **8 passed**; `tsc`: **0 errors**; `lint`: **0 errors**; `next build`: **17/17 routes**; live HTTP smoke test passed | `3010643` |
+| **Phase 3B — M5** | Business Directory Backend: Businesses, multi-business ownership, categories/services/amenities/payment methods/FAQs, addresses & SRID 4326 spatial columns, split-shift & midnight opening hours, encrypted KYC verifications (admin-separated), ownership claim workflow (separated from KYC verification), staff memberships & granular capabilities, `url_redirects` (301), `audit_logs`, independent Laravel Policies, privacy-safe `PublicBusinessResource`, Owner management APIs, EN/TA reference APIs, and frontend DTO contracts (`directory-types.ts`) | **Completed & Verified** | Clean 12-migration `migrate:fresh --seed`, re-run, rollback + re-migrate passed; Backend SQLite tests: **43 passed (456 assertions)**; MySQL 8.0 integration tests skipped: **2**; Pint: **passed**; Frontend `tsc`: **0 errors**; Frontend Vitest: **8 passed** | *(Milestone 5 commit)* |
+| **Phase 3B — M6** | Media Pipeline (MinIO/S3 public + private KYC buckets, EXIF stripping, WebP transcoding, signed URLs) | Pending | Not started | — |
+| **Phase 3B — M7** | Search Engine (MySQL 8.0 Spatial + English/Tamil FullText, Bayesian ranking, Sponsored slots, Autocomplete & Benchmarks) | Pending | Not started | — |
+| **Phase 3B — M8** | Live Frontend Integration (wire NearGrid `(customer)` & `(business)` views to live Directory/Media/Search APIs via BFF, removing demo banners) | Pending | Not started | — |
+| **Phase 3C–3E** | Consented Enquiries, Reviews, Custom Blade Admin (2FA + KYC Queue), Payments/Webhooks & Production Hardening | Pending | Not started | — |
 
 ---
 
-## 3. Milestone 4 Verification & Honesty Matrix
+## 3. Milestone 5 Implementation & Verification Summary
 
-### 3.1 Live Connected vs. Demo Data Boundaries
-* **Live Connected (to existing Laravel 13 Identity API via Next.js BFF):**
-  * `/login` (`POST /api/auth/otp/request`, `/resend`, `/verify`)
-  * `/dashboard/settings` (`GET/PATCH /api/auth/me`, `GET/POST/DELETE /api/auth/devices`, `GET/DELETE /api/auth/sessions`, `POST /api/auth/logout-all`)
-  * Header & Sidebar auth status + `POST /api/auth/logout`
-* **Clearly Labelled Fictional Demo Data (Phase 3B/3C backend modules not yet built):**
-  * Homepage featured businesses & category counts (`/`)
-  * Client-side search & filter preview (`/search`)
-  * Business profile showcase, services, hours, reviews & consent-first enquiry preview (`/[city]/business/[slug]`)
-  * Business Dashboard Overview KPIs, Profile editor, Photos & Services, Opening Hours, and Enquiries CRM (`/dashboard`, `/dashboard/profile`, `/dashboard/media-services`, `/dashboard/hours`, `/dashboard/enquiries`)
+### 3.1 Backend Components Delivered
+* **Migrations:**
+  * `2026_11_18_100001_create_attributes_and_governance_tables.php`: `amenities`, `payment_methods`, `url_redirects`, `audit_logs`.
+  * `2026_11_18_100002_create_businesses_core_tables.php`: `businesses` (ULID `public_id`, `UNIQUE(city_id, slug)`, MySQL 8.0 `location_point POINT NOT NULL SRID 4326` + `SPATIAL INDEX` + `FULLTEXT INDEX`), `business_categories`, `business_hours` (`UNIQUE(business_id, day_of_week, slot_index)`), `business_services` (ULID), `business_amenities`, `business_payment_methods`, `business_faqs`.
+  * `2026_11_18_100003_create_business_members_verifications_and_claims_tables.php`: `business_members` (ULID, `UNIQUE(business_id, user_id)`), `business_verifications` (ULID, encrypted `document_number_encrypted`), `business_claims` (ULID).
+* **Reference Seeder Added:** `AttributesSeeder` (amenities & payment methods) wired idempotently into `DatabaseSeeder`.
+* **Domain Services & Audit Logging:** `AuditLogger`, `BusinessCompletenessCalculator`, `BusinessManagementService`, `BusinessVerificationAndClaimService` (admin-only `reviewVerification`, `reviewClaim`, `changePublicationStatus` enforcing strict separation between ownership claim approval and KYC verification).
+* **Independent Policies:** `BusinessPolicy`, `BusinessServicePolicy`, `BusinessMemberPolicy` enforced independently of Sanctum token abilities.
+* **REST Endpoints (`/api/v1/*`):**
+  * Public Reference: `GET /locations/cities`, `GET /locations/cities/{citySlug}/localities`, `GET /categories`, `GET /attributes` (supporting `?locale=en|ta`).
+  * Public Storefront: `GET /businesses/{citySlug}/{businessSlug}` (active-only, `301` redirect lookup, `PublicBusinessResource` stripping all private owner/KYC/staff/raw-phone fields).
+  * Authenticated Claim & Owner/Staff APIs: `POST /businesses/{business}/claims`, `GET/POST /owner/businesses`, `GET/PUT /owner/businesses/{business}`, `PUT /owner/businesses/{business}/hours`, `POST/PUT/DELETE /owner/businesses/{business}/services/{service}`, `GET/POST/PATCH/DELETE /owner/businesses/{business}/members/{member}`, `GET/POST /owner/businesses/{business}/verifications`.
+* **Frontend Preparation:** Added `frontend/src/shared/api/directory-types.ts` without removing or falsifying demo data on existing UI screens.
 
-### 3.2 Environment & Integration Notes
-* **Frontend Automated Verification:** All 8 Vitest security tests, TypeScript check (`tsc --noEmit`), ESLint (`next lint`), Next.js production build (`next build`), and live HTTP smoke test (`next start`) passed locally on Node `v24.11.1`.
-* **Redis & MySQL 8.0 Live Integration Pending:** Because Docker, MySQL 8.0, and Redis 7 are not yet installed/running on this local machine, `RedisBffSessionStore` (implemented with `ioredis` + AES-256-GCM encryption and fail-closed production check) and `MySql8SpatialIntegrationTest` remain pending live Docker/MySQL 8.0/Redis 7 runtime execution.
+### 3.2 Test Counts & Skipped MySQL 8.0 Integration Tests
+* **Backend Automated Tests (`php artisan test` on SQLite):** **43 passed (456 assertions)** in `3.74s`.
+  * New Milestone 5 tests: `BusinessDirectoryManagementTest` (5) + `PublicProfileVerificationClaimTest` (4).
+* **Backend MySQL 8.0 Integration Tests Skipped (2):**
+  1. `MySql8SpatialIntegrationTest::test_mysql8_srid_4326_spatial_distance_and_fulltext_indexes`
+  2. `MySql8DirectoryIntegrationTest::test_mysql8_business_location_point_srid_4326_and_fulltext_index`
+  * **Known Limitation:** Actual MySQL 8.0 and Docker are not installed on this local Windows machine (XAMPP has MariaDB 10.4.32, which is explicitly rejected by `MySql8DirectoryIntegrationTest`). Actual MySQL 8.0 `SRID 4326` spatial, `SPATIAL INDEX`, and `FULLTEXT` execution remains unverified until MySQL 8.0 is provisioned locally or in CI.
+* **Backend Code Style (`vendor/bin/pint --test`):** **Passed**.
+* **Frontend Checks:** `tsc --noEmit` (**0 errors**), `vitest run` (**8 passed**).

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use Database\Seeders\Reference\AttributesSeeder;
 use Database\Seeders\Reference\CategoriesSeeder;
 use Database\Seeders\Reference\LocationsSeeder;
 use Database\Seeders\Reference\RolesAndPermissionsSeeder;
@@ -21,6 +22,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             LocationsSeeder::class,
             CategoriesSeeder::class,
+            AttributesSeeder::class,
         ]);
     }
 }

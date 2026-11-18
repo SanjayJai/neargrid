@@ -26,7 +26,10 @@ trait HasSpatialCenterPoint
 
             // MySQL 8.0 SRID 4326 uses (latitude longitude) axis order by default.
             $wkt = sprintf('POINT(%.7F %.7F)', $lat, $lng);
-            $model->setAttribute('center_point', DB::raw("ST_GeomFromText('{$wkt}', 4326)"));
+            $column = method_exists($model, 'spatialPointColumn')
+                ? $model->spatialPointColumn()
+                : 'center_point';
+            $model->setAttribute($column, DB::raw("ST_GeomFromText('{$wkt}', 4326)"));
         });
     }
 }
