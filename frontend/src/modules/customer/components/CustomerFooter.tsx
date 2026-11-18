@@ -1,87 +1,114 @@
 import Link from 'next/link';
-import { DEMO_CATEGORIES, DEMO_CITIES } from '@/shared/data/demo-directory';
+import type { ReferenceCategoryDto, ReferenceCityDto } from '@/shared/api/directory-types';
+import { NearGridLogo } from '@/shared/ui/NearGridLogo';
+import { buildShareableSearchUrl } from '@/modules/customer/lib/search-url';
 
-export function CustomerFooter() {
+interface CustomerFooterProps {
+  cities: ReferenceCityDto[];
+  categories: ReferenceCategoryDto[];
+}
+
+export function CustomerFooter({ cities, categories }: CustomerFooterProps) {
+  const defaultCity = cities[0]?.slug ?? 'chennai';
+  const featuredCategories = categories
+    .flatMap((root) => (root.children.length > 0 ? root.children : [root]))
+    .slice(0, 8);
+
   return (
-    <footer className="border-t border-zinc-200 bg-zinc-50 text-zinc-700">
+    <footer className="border-t border-gray-200 bg-white text-ink-muted">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-3">
-            <div className="flex items-center gap-2.5 text-zinc-950">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-950 text-xs font-bold text-white">
-                NG
-              </span>
-              <span className="text-base font-semibold tracking-tight">NearGrid</span>
-            </div>
-            <p className="text-sm leading-relaxed text-zinc-600">
-              An independent, privacy-first local business directory built for transparent discovery
-              across English and Tamil communities.
+            <NearGridLogo href="/" />
+            <p className="text-xs leading-relaxed text-ink-muted">
+              NearGrid is an independent local business directory built for fast English, Tamil
+              (தமிழ்), and Tanglish discovery with verified listings, clear sponsorship labels, and
+              privacy-first enquiries.
             </p>
           </div>
 
           <div>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-950">
+            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-ink">
               Popular Categories
             </h2>
-            <ul className="space-y-2 text-sm">
-              {DEMO_CATEGORIES.slice(0, 5).map((cat) => (
-                <li key={cat.slug}>
-                  <Link
-                    href={`/search?category=${cat.slug}`}
-                    className="transition-colors hover:text-zinc-950"
-                  >
-                    {cat.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {featuredCategories.length === 0 ? (
+              <p className="text-xs text-ink-subtle">Categories load from live directory API.</p>
+            ) : (
+              <ul className="grid grid-cols-1 gap-1.5 text-xs">
+                {featuredCategories.map((cat) => (
+                  <li key={cat.public_id}>
+                    <Link
+                      href={buildShareableSearchUrl({ city: defaultCity, category: cat.slug })}
+                      className="transition-colors hover:text-brand-700 hover:underline"
+                    >
+                      {cat.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-950">
-              Cities
+            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-ink">
+              Explore Cities
             </h2>
-            <ul className="space-y-2 text-sm">
-              {DEMO_CITIES.map((city) => (
-                <li key={city.slug}>
-                  <Link
-                    href={`/search?city=${city.slug}`}
-                    className="transition-colors hover:text-zinc-950"
-                  >
-                    {city.name} <span className="text-zinc-400">· {city.nameTa}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {cities.length === 0 ? (
+              <p className="text-xs text-ink-subtle">Cities load from live locations API.</p>
+            ) : (
+              <ul className="grid grid-cols-2 gap-1.5 text-xs">
+                {cities.slice(0, 10).map((city) => (
+                  <li key={city.slug}>
+                    <Link
+                      href={`/?city=${encodeURIComponent(city.slug)}`}
+                      className="transition-colors hover:text-brand-700 hover:underline"
+                    >
+                      {city.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-950">
-              Platform
+            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-ink">
+              For Business Owners
             </h2>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2 text-xs">
               <li>
-                <Link href="/dashboard" className="transition-colors hover:text-zinc-950">
+                <Link
+                  href="/dashboard"
+                  className="font-semibold text-signal-700 transition-colors hover:underline"
+                >
+                  List Your Business Free
+                </Link>
+              </li>
+              <li>
+                <Link href="/dashboard" className="transition-colors hover:text-brand-700 hover:underline">
                   Business Owner Dashboard
                 </Link>
               </li>
               <li>
-                <Link href="/login" className="transition-colors hover:text-zinc-950">
-                  OTP Sign In
+                <Link href="/login" className="transition-colors hover:text-brand-700 hover:underline">
+                  Sign in with Mobile OTP
                 </Link>
               </li>
               <li>
-                <Link href="/search" className="transition-colors hover:text-zinc-950">
-                  Browse Demo Listings
+                <Link
+                  href={buildShareableSearchUrl({ city: defaultCity })}
+                  className="transition-colors hover:text-brand-700 hover:underline"
+                >
+                  Browse Local Directory
                 </Link>
               </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t border-zinc-200 pt-6 text-xs text-zinc-500 sm:flex-row sm:items-center">
-          <p>© {new Date().getFullYear()} NearGrid Directory. Cleanroom foundation build.</p>
-          <p>Consent-first enquiries · Zero silent PII capture · Clearly labelled sponsorships</p>
+        <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-gray-200 pt-6 text-xs text-ink-subtle sm:flex-row sm:items-center">
+          <p>© {new Date().getFullYear()} NearGrid Directory. Independent Local Discovery Platform.</p>
+          <p>English &amp; தமிழ் Search · Verified Listings · Clearly Labelled Sponsorships</p>
         </div>
       </div>
     </footer>
