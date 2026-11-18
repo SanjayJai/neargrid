@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Api;
 
+use App\Domains\Identity\Exceptions\IdentityException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -24,6 +25,16 @@ final class ApiExceptionRenderer
     {
         if (! $request->is('api/*') && ! $request->expectsJson()) {
             return null;
+        }
+
+        if ($exception instanceof IdentityException) {
+            return ApiResponse::error(
+                code: $exception->errorCode,
+                message: $exception->getMessage(),
+                status: $exception->httpStatus,
+                details: $exception->details,
+                headers: $exception->headers,
+            );
         }
 
         if ($exception instanceof ValidationException) {

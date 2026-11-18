@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Identity\Models;
 
 use App\Models\User;
+use App\Support\Concerns\HasPublicUlid;
 use Database\Factories\UserDeviceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,10 +21,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'app_version',
     'last_active_at',
 ])]
+#[Hidden([
+    'id',
+    'user_id',
+    'fcm_token',
+])]
 class UserDevice extends Model
 {
     /** @use HasFactory<UserDeviceFactory> */
-    use HasFactory;
+    use HasFactory, HasPublicUlid;
 
     protected static function newFactory(): UserDeviceFactory
     {

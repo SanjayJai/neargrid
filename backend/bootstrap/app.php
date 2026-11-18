@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\AssignRequestId;
+use App\Http\Middleware\EnsureActiveUser;
 use App\Http\Middleware\ForceJsonResponse;
+use App\Http\Middleware\RequirePermission;
+use App\Http\Middleware\RequireRole;
 use App\Http\Middleware\SecurityHeaders;
 use App\Support\Api\ApiExceptionRenderer;
 use Illuminate\Foundation\Application;
@@ -38,6 +41,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
+            'active' => EnsureActiveUser::class,
+            'role' => RequireRole::class,
+            'permission' => RequirePermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
