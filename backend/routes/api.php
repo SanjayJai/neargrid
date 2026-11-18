@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Directory\PublicBusinessController;
 use App\Http\Controllers\Api\V1\Directory\ReferenceTaxonomyController;
 use App\Http\Controllers\Api\V1\Media\BusinessMediaController;
 use App\Http\Controllers\Api\V1\Media\KycDocumentController;
+use App\Http\Controllers\Api\V1\Search\SearchController;
 use App\Http\Controllers\Api\V1\SystemController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +26,14 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
     // Public business profiles (only status=active, privacy-safe resource)
     Route::get('/businesses/{citySlug}/{businessSlug}', [PublicBusinessController::class, 'show'])->name('businesses.show');
+
+    // Public search, nearby discovery, autocomplete & filters (rate-limited, active-only)
+    Route::prefix('search')->name('search.')->group(function (): void {
+        Route::get('/', [SearchController::class, 'search'])->middleware('throttle:search')->name('index');
+        Route::get('/nearby', [SearchController::class, 'nearby'])->middleware('throttle:search')->name('nearby');
+        Route::get('/suggestions', [SearchController::class, 'suggestions'])->middleware('throttle:search-suggestions')->name('suggestions');
+        Route::get('/filters', [SearchController::class, 'filters'])->middleware('throttle:search')->name('filters');
+    });
 
     // Authentication & sessions
     Route::prefix('auth')->name('auth.')->group(function (): void {

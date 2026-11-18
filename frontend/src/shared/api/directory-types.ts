@@ -139,6 +139,74 @@ export interface KycSignedDownloadUrlDto {
   ttl_seconds: number;
 }
 
+export type SearchSortOptionDto = 'relevance' | 'rating' | 'distance' | 'popularity' | 'newest';
+
+export interface SearchBusinessHitDto {
+  public_id: string;
+  name: string;
+  slug: string;
+  tagline: string | null;
+  city_slug: string | null;
+  city_name: string | null;
+  locality_slug: string | null;
+  locality_name: string | null;
+  primary_category: {
+    public_id: string;
+    slug: string;
+    name: string;
+  } | null;
+  is_sponsored: boolean;
+  sponsor_disclosure: string | null;
+  is_verified: boolean;
+  is_trusted: boolean;
+  is_claimed: boolean;
+  rating_avg: number;
+  review_count: number;
+  completeness_score: number;
+  distance_km: number | null;
+  is_open_now: boolean;
+  address_short: string;
+  phone_masked: string;
+  has_whatsapp: boolean;
+  services_preview: string[];
+  media_preview: Array<{
+    public_id: string;
+    media_type: BusinessMediaTypeDto;
+    alt_text: string | null;
+    urls: MediaVariantUrlsDto;
+  }>;
+}
+
+export interface SearchSeoMetaDto {
+  canonical_path: string;
+  canonical_url: string;
+  robots: 'index, follow' | 'noindex, follow';
+  is_indexable: boolean;
+  noindex_reason: string | null;
+}
+
+export interface SearchSuggestionsDto {
+  categories: Array<{ public_id: string; slug: string; name: string; type: 'category' }>;
+  services: Array<{ name: string; type: 'service' }>;
+  cities: Array<{ slug: string; name: string; type: 'city' }>;
+  localities: Array<{
+    slug: string;
+    name: string;
+    city_slug: string | null;
+    pincode: string | null;
+    type: 'locality';
+  }>;
+  businesses: Array<{
+    public_id: string;
+    name: string;
+    slug: string;
+    city_slug: string | null;
+    locality_name: string | null;
+    is_verified: boolean;
+    type: 'business';
+  }>;
+}
+
 export interface OwnerBusinessProfileDto {
   public_id: string;
   name: string;

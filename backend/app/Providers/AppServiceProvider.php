@@ -13,6 +13,8 @@ use App\Domains\Identity\Models\UserDevice;
 use App\Domains\Identity\Services\NullOtpSender;
 use App\Domains\Media\Models\BusinessMedia;
 use App\Domains\Media\Models\KycDocument;
+use App\Domains\Search\Contracts\SearchEngineInterface;
+use App\Domains\Search\Engines\MysqlSearchEngine;
 use App\Models\User;
 use App\Policies\BusinessMediaPolicy;
 use App\Policies\BusinessMemberPolicy;
@@ -22,7 +24,10 @@ use App\Policies\KycDocumentPolicy;
 use App\Policies\PersonalAccessTokenPolicy;
 use App\Policies\UserDevicePolicy;
 use App\Policies\UserPolicy;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 
@@ -31,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(OtpSender::class, NullOtpSender::class);
+        $this->app->bind(SearchEngineInterface::class, MysqlSearchEngine::class);
     }
 
     public function boot(): void
@@ -45,5 +51,17 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(BusinessMember::class, BusinessMemberPolicy::class);
         Gate::policy(BusinessMedia::class, BusinessMediaPolicy::class);
         Gate::policy(KycDocument::class, KycDocumentPolicy::class);
+
+        RateLimiter::for('search', static function (Request $request): Limit {
+            $perMinute = max(10, (int) config('search.rate_limit_per_minute', 120));
+
+            return Limit::perMinute($perMinute)->by((string) $request->ip());
+        });
+
+        RateLimiter::for('search-suggestions', static function (Request $request): Limit {
+            $perMinute = max(10, (int) config('search.autocomplete.rate_limit_per_minute', 120));
+
+            return Limit::perMinute($perMinute)->by((string) $request->ip());
+        });
     }
 }

@@ -8,6 +8,7 @@ use Database\Seeders\Reference\AttributesSeeder;
 use Database\Seeders\Reference\CategoriesSeeder;
 use Database\Seeders\Reference\LocationsSeeder;
 use Database\Seeders\Reference\RolesAndPermissionsSeeder;
+use Database\Seeders\Reference\SearchSynonymsSeeder;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -23,6 +24,7 @@ class DatabaseSeeder extends Seeder
             LocationsSeeder::class,
             CategoriesSeeder::class,
             AttributesSeeder::class,
+            SearchSynonymsSeeder::class,
         ]);
     }
 }

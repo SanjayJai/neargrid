@@ -3,11 +3,11 @@
 ## 1. Current Status Summary
 
 * **Active Phase:** Phase 3B — Business Directory Core, Media, Search & Live Integration
-* **Current Milestone Completed:** **Milestone 6 — Secure Media Pipeline**
-* **Next Planned Milestone:** **Milestone 7 — Search Engine (MySQL 8.0 Spatial + English/Tamil FullText, Bayesian Ranking, Sponsored Slots, Autocomplete & Benchmarks)** (awaiting approval to proceed)
+* **Current Milestone Completed:** **Milestone 7 — Search Engine**
+* **Next Planned Milestone:** **Milestone 8 — Live Frontend Integration (wire NearGrid `(customer)` & `(business)` views to live Directory/Media/Search APIs via BFF, removing demo banners)** (awaiting approval to proceed)
 * **Stack Compliance Check:**
   * Backend: Laravel `v13.43.0` (PHP `8.3.36`), `laravel/sanctum v4.5.0`, `predis/predis v3.7.1`, `league/flysystem-aws-s3-v3 v3.35.3`, **Zero Filament**
-  * Frontend: Single Next.js `14.2.35` (App Router) + React `18.3.1` + TypeScript `5.7.2` + Tailwind CSS `3.4.19` + `ioredis` (Demo UI preserved honestly until Milestone 8; typed Directory & Media DTO contracts in `frontend/src/shared/api/directory-types.ts`)
+  * Frontend: Single Next.js `14.2.35` (App Router) + React `18.3.1` + TypeScript `5.7.2` + Tailwind CSS `3.4.19` + `ioredis` (Demo UI preserved honestly until Milestone 8; typed Directory, Media & Search DTO contracts in `frontend/src/shared/api/directory-types.ts`)
 
 ---
 
@@ -22,8 +22,8 @@
 | **Phase 3A — M3** | Identity Domain: CSPRNG OTP, HMAC-SHA256, atomic single-use consumption, cooldown/rate limits, Sanctum Bearer tokens, device & session revocation, independent Laravel Policies & live DB RBAC middleware | **Completed & Verified** | SQLite tests: **34 passed (321 assertions)**; MySQL 8.0 skipped: **1**; Pint: **passed** | `e79a2b2` |
 | **Phase 3A — M4** | Single Next.js 14 + React 18 + Tailwind app (`frontend/`) with `(customer)` & `(business)` route groups, NearGrid UI, opaque HttpOnly BFF cookie + AES-256-GCM Redis session store, Origin + CSRF guards, live Auth/Settings wiring, Demo views (`docs/16`) | **Completed & Verified** | Vitest: **8 passed**; `tsc`: **0 errors**; `lint`: **0 errors**; `next build`: **17/17 routes**; live HTTP smoke test passed | `3010643` |
 | **Phase 3B — M5** | Business Directory Backend: Businesses, multi-business ownership, categories/services/amenities/payment methods/FAQs, addresses & SRID 4326 spatial columns, split-shift & midnight opening hours, encrypted KYC verifications (admin-separated), ownership claim workflow (separated from KYC verification), staff memberships & granular capabilities, `url_redirects` (301), `audit_logs`, independent Laravel Policies, privacy-safe `PublicBusinessResource`, Owner management APIs, EN/TA reference APIs, and frontend DTO contracts (`directory-types.ts`) | **Completed & Verified** | Clean 12-migration `migrate:fresh --seed`, re-run, rollback + re-migrate passed; Backend SQLite tests: **43 passed (456 assertions)**; MySQL 8.0 integration tests skipped: **2**; Pint: **passed**; Frontend `tsc`: **0 errors**; Frontend Vitest: **8 passed** | `f00e875` |
-| **Phase 3B — M6** | Secure Media Pipeline: `business_media` & `kyc_documents` migrations/models (ULIDs), `league/flysystem-aws-s3-v3` S3/MinIO disk separation (`media_public` vs `kyc_private`), magic-byte signature validation (`FileSignatureValidator`), GD WebP transcoding (`thumb`/`card`/`full`) & EXIF/GPS stripping (`ImageProcessor`), configurable original preservation (`false` default), async `ProcessBusinessMediaJob` on `media` queue with retries & failure cleanup, actor-bound short-lived signed KYC downloads (`60s` TTL), `BusinessMediaPolicy` & `KycDocumentPolicy`, `PublicBusinessResource` approved-only media integration, and frontend media/KYC DTOs | **Completed & Verified** | Clean 13-migration `migrate:fresh --seed`, rollback + re-migrate passed; Backend SQLite tests: **52 passed (613 assertions)**; Skipped: **3** (2 MySQL 8.0 + 1 live MinIO/S3); Pint: **passed**; Frontend `tsc`: **0 errors**; Frontend Vitest: **8 passed** | *(Milestone 6 commit)* |
-| **Phase 3B — M7** | Search Engine (MySQL 8.0 Spatial + English/Tamil FullText, Bayesian ranking, Sponsored slots, Autocomplete & Benchmarks) | Pending | Not started | — |
+| **Phase 3B — M6** | Secure Media Pipeline: `business_media` & `kyc_documents` migrations/models (ULIDs), `league/flysystem-aws-s3-v3` S3/MinIO disk separation (`media_public` vs `kyc_private`), magic-byte signature validation (`FileSignatureValidator`), GD WebP transcoding (`thumb`/`card`/`full`) & EXIF/GPS stripping (`ImageProcessor`), configurable original preservation (`false` default), async `ProcessBusinessMediaJob` on `media` queue with retries & failure cleanup, actor-bound short-lived signed KYC downloads (`60s` TTL), `BusinessMediaPolicy` & `KycDocumentPolicy`, `PublicBusinessResource` approved-only media integration, and frontend media/KYC DTOs | **Completed & Verified** | Clean 13-migration `migrate:fresh --seed`, rollback + re-migrate passed; Backend SQLite tests: **52 passed (613 assertions)**; Skipped: **3** (2 MySQL 8.0 + 1 live MinIO/S3); Pint: **passed**; Frontend `tsc`: **0 errors**; Frontend Vitest: **8 passed** | `3034955` |
+| **Phase 3B — M7** | Search Engine: Modular `Search` domain (`SearchEngineInterface` Meilisearch seam + `MysqlSearchEngine`), `search_synonyms` / `sponsored_placements` / `search_query_logs` migration & `SearchSynonymsSeeder` (EN/TA/Tanglish), Unicode NFC + synonym resolver, MySQL 8 `FULLTEXT` + SRID 4326 `MBRContains`/`ST_Distance_Sphere` spatial retrieval, configurable composite + Bayesian damped ranking, isolated Sponsored placement selector with quality/publication gates, Redis-backed autocomplete with DB fallback & rate limiting, SEO canonical/noindex advisor, `GET /api/v1/search`, `/nearby`, `/suggestions`, `/filters`, `docs/17`, and frontend search DTOs | **Completed & Verified** | Clean 14-migration `migrate:fresh --seed`, rollback + re-migrate passed; Backend SQLite tests: **66 passed (785 assertions)**; Failed: **0**; Skipped: **5** (3 MySQL 8.0 + 1 live MinIO/S3 + 1 live Redis 7); Pint: **passed**; Frontend `tsc`: **0 errors**; Frontend Vitest: **8 passed** | *(Milestone 7 commit)* |
 | **Phase 3B — M8** | Live Frontend Integration (wire NearGrid `(customer)` & `(business)` views to live Directory/Media/Search APIs via BFF, removing demo banners) | Pending | Not started | — |
 | **Phase 3C–3E** | Consented Enquiries, Reviews, Custom Blade Admin (2FA + KYC Queue), Payments/Webhooks & Production Hardening | Pending | Not started | — |
 
@@ -88,5 +88,37 @@
   3. `MinioS3IntegrationTest::test_live_minio_s3_public_and_private_bucket_separation` (no local MinIO/Docker running; `MEDIA_PUBLIC_DRIVER` and `MEDIA_KYC_DRIVER` default to `local` outside Docker/CI).
 * **Migrations, Style & Frontend Checks:**
   * Clean 13-migration `migrate:fresh --seed`, `migrate:rollback --step=1`, and re-`migrate` passed.
+  * `vendor/bin/pint --test` passed; Filament check passed (`0` Filament dependencies).
+  * Frontend `tsc --noEmit` (`0` errors) and Vitest (`8 passed`).
+
+---
+
+## 5. Milestone 7 Implementation & Verification Summary
+
+### 5.1 Backend Components Delivered
+* **Architecture & Upgrade Seam:** `SearchEngineInterface` bound to `MysqlSearchEngine` in `AppServiceProvider`, allowing Stage 2 Meilisearch introduction with zero API contract changes.
+* **Schema, Indexes & Reference Seeding:**
+  * `2026_11_18_120001_create_search_engine_tables.php`: `search_synonyms`, `sponsored_placements` (ULID), `search_query_logs` (PII-free), `businesses` composite index `idx_businesses_search_active_city_name`, and MySQL 8 `FULLTEXT INDEX idx_biz_services_fulltext (name, description)`.
+  * `SearchSynonymsSeeder`: Idempotent English, Tamil Unicode, and Tanglish synonym mappings wired into `DatabaseSeeder`.
+* **Modular Domain Services (`backend/app/Domains/Search/`):**
+  * `QueryNormalizerAndSynonymResolver`: Unicode NFC normalization, control-char stripping, original display query preservation, Tamil inflection stem handling, and DB-driven EN/TA/Tanglish + parent-category expansion.
+  * `GeoSpatialHelper`: Exact WGS-84 Haversine distance and MySQL 8 SRID 4326 lat-first WKT point/bounding-polygon builders.
+  * `SearchRankingService`: Configurable composite scoring (`text`, `category_service`, `geo`, `rating`, `trust`, `completeness`, `recency`), Bayesian damped rating (`m=10`, `C=3.5`), strict `SearchSortOption` allowlist, and deterministic tie-breaking.
+  * `SponsoredPlacementSelector`: Isolated Page-1 paid placement query enforcing `status=active`, active schedule, remaining budget, `businesses.status=active`, `completeness_score >= 40`, rating floor (`>= 3.0` when `>= 5` reviews), mandatory `"Sponsored"` disclosure, and Page 1 organic deduplication.
+  * `AutocompleteService` & `FilterOptionsService`: Redis-backed caching with automatic DB fallback on Redis unavailability, minimum query length (`2`), active-only privacy enforcement, and rate limiting (`throttle:search`, `throttle:search-suggestions`).
+  * `SearchSeoAdvisor` & `SearchPerformanceLogger`: Canonical path/URL rules, thin-page/filtered `X-Robots-Tag: noindex, follow` headers, cache headers, and privacy-safe `search_query_logs` + slow-query warning logs.
+* **Public Search API (`/api/v1/search*`):** `GET /search`, `GET /search/nearby`, `GET /search/suggestions`, `GET /search/filters`, documented in `docs/17-search-engine-implementation-and-api.md`, with matching TypeScript DTOs in `frontend/src/shared/api/directory-types.ts`.
+
+### 5.2 Test Counts & Infrastructure Limitations
+* **Backend Automated Tests (`php artisan test` on SQLite + `array` cache):** **66 passed (785 assertions)**, **0 failed**.
+  * New Milestone 7 tests: `SearchEngineTest` (10) + `AutocompleteAndFiltersTest` (4).
+* **Skipped Live Infrastructure Integration Tests (5):**
+  1. `MySql8SpatialIntegrationTest::test_mysql8_srid_4326_spatial_distance_and_fulltext_indexes` (no local MySQL 8.0 / Docker).
+  2. `MySql8DirectoryIntegrationTest::test_mysql8_business_location_point_srid_4326_and_fulltext_index` (no local MySQL 8.0 / Docker).
+  3. `MySql8SearchEngineIntegrationTest::test_mysql8_fulltext_tamil_tanglish_and_spatial_index_execution` (no local MySQL 8.0 / Docker — SQLite tests do NOT prove MySQL 8 `FULLTEXT` or `SRID 4326` `EXPLAIN` plans).
+  4. `MinioS3IntegrationTest::test_live_minio_s3_public_and_private_bucket_separation` (no local MinIO / Docker).
+  5. `RedisAutocompleteIntegrationTest::test_live_redis_autocomplete_caching` (no local Redis 7 server running at `127.0.0.1:6379`).
+* **Migrations, Style & Frontend Checks:**
+  * Clean 14-migration `migrate:fresh --seed`, `migrate:rollback --step=1`, and re-`migrate` passed.
   * `vendor/bin/pint --test` passed; Filament check passed (`0` Filament dependencies).
   * Frontend `tsc --noEmit` (`0` errors) and Vitest (`8 passed`).
