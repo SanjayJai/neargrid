@@ -1,0 +1,121 @@
+# 06 - Comprehensive Feature Inventory & System Architecture
+
+## 1. Executive Summary
+
+This document synthesizes the findings from the Phase 1 Discovery and Analysis of Justdial. It provides an exhaustive feature matrix categorized by user persona (End Customer, Business Owner, Platform Admin), outlines the complete cleanroom system architecture following the approved technology stack, and details our verified evidence, identified unknowns, and recommendations for Phase 2.
+
+---
+
+## 2. Comprehensive Feature Matrix
+
+### 2.1 Customer-Facing Features (Next.js Web & Future Flutter App)
+
+| Feature Module | Feature Description | Priority |
+| :--- | :--- | :--- |
+| **Location Detection** | Automatic HTML5 GPS detection, reverse geocoding, top metro selector, and manual locality input | P0 (Must Have) |
+| **Dual-Axis Search** | Combined keyword/category and city/locality search bar with debounced typeahead suggestions | P0 (Must Have) |
+| **Category Browsing** | 60+ primary category hotkeys, nested subcategories, and SEO-friendly slug routes | P0 (Must Have) |
+| **SERP Listing Stream** | Fast paginated results displaying business cards with ratings, verified badges, and addresses | P0 (Must Have) |
+| **Multi-Facet Filters** | Radius slider, locality checkboxes, rating threshold (4.0+, 4.5+), Open Now, Verified Only | P0 (Must Have) |
+| **Sorting Engine** | Sort by Relevance (weighted), Rating (high to low), Distance (nearest), and Popularity | P0 (Must Have) |
+| **Business Storefront** | Dedicated business profile with 5-photo mosaic, working hours, services, map, and FAQs | P0 (Must Have) |
+| **Phone Number Reveal** | "Show Number" action with intent logging, rate limiting, and native tel: dialer trigger | P0 (Must Have) |
+| **Direct & Broadcast Enquiry**| "Get Best Deal" / "Enquire Now" modal capturing service needs with instant OTP verification | P0 (Must Have) |
+| **Hot Lead on Blur** | Real-time lead capture trigger when customer enters mobile number and moves focus | P1 (High) |
+| **WhatsApp Direct Connect** | 1-click WhatsApp web/app link pre-filled with business inquiry context | P1 (High) |
+| **Reviews & Ratings** | Star rating, multi-attribute scoring, written reviews, photo attachments, helpful votes | P1 (High) |
+| **User Authentication** | Passwordless mobile OTP login returning Laravel Sanctum Bearer tokens | P0 (Must Have) |
+| **Bookmarks & History** | Save favorite businesses and review recently browsed listings | P2 (Medium) |
+
+---
+
+### 2.2 Business Owner Features (Next.js Dashboard: `apps/business`)
+
+| Feature Module | Feature Description | Priority |
+| :--- | :--- | :--- |
+| **Free Listing Registration** | Multi-step onboarding: Company info, contact person, mobile OTP, address, category, and timings | P0 (Must Have) |
+| **Inbound Lead CRM** | Real-time pipeline to view customer enquiries with status updates (New, Contacted, Converted) | P0 (Must Have) |
+| **One-Click Lead Actions** | Direct "Call Lead" and "WhatsApp Lead" actions from within the dashboard | P0 (Must Have) |
+| **Storefront Profile Editor** | Manage business description, services offered, starting prices, and operational timings | P0 (Must Have) |
+| **Media Uploader** | Upload storefront facade, interior, menu, service, and certificate images | P1 (High) |
+| **Reputation Management** | View incoming customer reviews and submit official merchant responses | P1 (High) |
+| **KYC & Verification** | Upload trade licenses, GSTIN certificates, and electricity bills for verification badge audits | P1 (High) |
+| **Performance Analytics** | Track profile impressions, phone reveals, and customer enquiries over 7/30-day windows | P2 (Medium) |
+
+---
+
+### 2.3 Platform Admin Features (Custom Laravel Blade Dashboard: `apps/api`)
+> **Note**: In strict accordance with architecture instructions, this panel is built using **Laravel Blade templates** and **Tailwind CSS**. **No Filament dependencies or panels are used.**
+
+| Feature Module | Feature Description | Priority |
+| :--- | :--- | :--- |
+| **Admin Authentication & RBAC**| Secure session login with roles: Super Admin, Verifier, Moderator, Support | P0 (Must Have) |
+| **Merchant Verification Queue**| Audit submitted business registrations, view uploaded KYC documents, and approve badges | P0 (Must Have) |
+| **Badge Management** | Grant or revoke **"Verified"** and **"Trust"** status badges based on physical/document audits | P0 (Must Have) |
+| **Category & Taxonomy Engine** | Create, edit, reorder categories, manage icons, and customize SEO slug rules | P0 (Must Have) |
+| **Location & City Manager** | Manage supported cities, sub-localities, pincodes, and coordinate centerpoints | P0 (Must Have) |
+| **Review Moderation** | Inspect flagged or suspicious reviews, edit/delete content, and manage user suspensions | P1 (High) |
+| **Lead Distribution Rules** | Configure lead broadcast quotas, geographical radius limits, and sponsored merchant weighting | P1 (High) |
+| **Promotional Banners** | Manage homepage carousel banners, active date ranges, and destination links | P1 (High) |
+| **System Audit Logs** | Comprehensive logs of all administrative actions and security events | P2 (Medium) |
+
+---
+
+## 3. System Architecture & Separation of Concerns
+
+```mermaid
+flowchart LR
+    subgraph Frontend Tier
+        W["Customer Web Portal<br/>(Next.js App Router)"]
+        B["Business Owner CRM<br/>(Next.js App Router)"]
+        M["Future Mobile Clients<br/>(Flutter iOS / Android)"]
+    end
+
+    subgraph Backend & Admin Tier
+        API["Laravel 13 REST API<br/>(/api/v1/* - Bearer Auth)"]
+        ADM["Custom Admin Dashboard<br/>(/admin/* - Laravel Blade)"]
+    end
+
+    subgraph Data & Storage Tier
+        DB[("MySQL 8.0<br/>Spatial + FullText")]
+        RD[("Redis<br/>Cache & Suggestions")]
+        S3[("S3 / Cloud Storage<br/>Optimized Images")]
+    end
+
+    W -->|REST JSON| API
+    B -->|REST JSON + Bearer| API
+    M -->|REST JSON + Bearer| API
+    ADM -->|Eloquent ORM| DB
+    API --> DB
+    API --> RD
+    API --> S3
+    ADM --> S3
+```
+
+---
+
+## 4. Phase 1 Discovery Findings & Evidence Summary
+
+### 4.1 Verified Evidence (Observed from Live Discovery)
+1. **Next.js SSR Frontend**: Verified via `robots.txt` path `Disallow: /_next/` indicating Next.js route structures and server-rendered components.
+2. **Dual-Axis Search UX**: Verified presence of dual input controls (`#city` / `#insrch` and `#srchbx`) separating geographical filtering from service intent.
+3. **Category Hierarchy**: Extracted 60 active contextual categories and 24 featured SEO verticals from live page configuration objects (`ContextualHotkey` and `HomePageSeoLink`).
+4. **"Hot Lead on Blur" Optimization**: Discovered real-time `hotLeadApi('mobile_inputfield_onblur')` event listeners on phone inputs capturing abandoned leads before form submission.
+5. **Multi-Step Merchant Onboarding**: Discovered specific form parameters on `/free-listing` (`cn`, `flcity`, `fname`, `lname`, `fmb0`, `fph0`, and 6-digit OTP fields `pin_0` to `pin_5`).
+6. **Binary & Asset Inspection (via REA)**: Local analysis of CDN JavaScript (`webfont.min.js`) via REA MCP server confirmed production stripping of source maps (`sourceMappingURL`), validating that production assets are heavily bundled and minified.
+
+### 4.2 Known Unknowns
+1. **Telephony Call Masking**: Specific telecommunication bridge provider and pricing structures used for virtual number routing.
+2. **Dynamic Lead Bidding Algorithm**: Internal ranking weight formula between paid sponsored merchants and high-rated organic listings.
+3. **SMS / WhatsApp Gateway Fallback**: Exact retry timing thresholds for OTP delivery across SMS and WhatsApp channels.
+
+### 4.3 Recommendations for Phase 2 Implementation
+1. **Repository Structure**: Adopt a clean monorepo or dual-repo pattern:
+   * `apps/web`: Next.js Customer Web Application.
+   * `apps/business`: Next.js Business Owner Dashboard.
+   * `apps/api`: Laravel 13 REST API with custom Blade Admin.
+2. **Authentication Architecture**: Implement **Laravel Sanctum** providing personal access Bearer tokens for API consumers, paired with classic session-based cookies for the custom Laravel Blade admin dashboard.
+3. **Database Optimization**:
+   * Leverage MySQL 8.0 `POINT` spatial columns with spatial indexes for fast geolocation distance queries (`ST_Distance_Sphere`).
+   * Leverage MySQL FullText indexing for natural language category and business keyword searches.
+4. **Lead Engine Design**: Build a decoupled Laravel Job / Queue architecture (`ProcessInboundEnquiry`) to match verified merchants asynchronously without blocking customer HTTP requests.

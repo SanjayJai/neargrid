@@ -1,0 +1,19 @@
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Environment secrets
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env.local
+
+# Logs & temporary files
+*.log
+npm-debug.log*
+storage/*.key
+docker/data/
