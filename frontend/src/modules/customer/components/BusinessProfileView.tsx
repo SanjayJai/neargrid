@@ -26,7 +26,6 @@ import type { PublicBusinessProfileDto } from '@/shared/api/directory-types';
 import { Breadcrumbs, type BreadcrumbItem } from '@/shared/ui/Breadcrumbs';
 import { FallbackImage } from '@/shared/ui/FallbackImage';
 import { RatingPill } from '@/shared/ui/RatingPill';
-import { PendingFeatureNotice } from '@/shared/ui/StateFeedback';
 import {
   OpenStatusBadge,
   TrustedBadge,
@@ -45,6 +44,7 @@ import {
 import { BusinessClaimModal } from './BusinessClaimModal';
 import { BusinessMediaGallery } from './BusinessMediaGallery';
 import { BusinessProfileActions } from './BusinessProfileActions';
+import { CustomerReviewsSection } from './CustomerReviewsSection';
 import { EnquiryModal } from './EnquiryModal';
 
 interface BusinessProfileViewProps {
@@ -640,33 +640,18 @@ export function BusinessProfileView({
             )}
           </section>
 
-          {/* 6. Reviews (Real Aggregate Rating + Honest Phase 3C Notice) */}
+          {/* 6. Reviews (Live Customer Reviews & Submissions) */}
           <section
             id="reviews"
             className="scroll-mt-32 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
           >
-            <h2 className="text-lg font-bold text-ink">Ratings &amp; Reviews</h2>
-
-            <div className="mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
-              <RatingPill
-                ratingAvg={profile.rating_avg}
-                reviewCount={profile.review_count}
-                size="md"
-              />
-              <p className="text-xs text-ink-muted">
-                {profile.review_count > 0
-                  ? `Aggregate score of ${profile.rating_avg.toFixed(1)} out of 5 across ${profile.review_count} verified customer rating${profile.review_count === 1 ? '' : 's'}.`
-                  : 'No customer ratings have been recorded for this business yet.'}
-              </p>
-            </div>
-
-            <div className="mt-4">
-              <PendingFeatureNotice
-                title="Individual Customer Reviews & Submissions"
-                description="Reading individual review threads, submitting new customer reviews, and merchant replies are scheduled for Phase 3C. NearGrid displays only real aggregate rating data from the backend."
-                phaseLabel="Phase 3C Scheduled"
-              />
-            </div>
+            <CustomerReviewsSection
+              businessId={profile.public_id}
+              businessName={profile.name}
+              citySlug={citySlug}
+              initialRatingAvg={profile.rating_avg}
+              initialReviewCount={profile.review_count}
+            />
           </section>
         </div>
 

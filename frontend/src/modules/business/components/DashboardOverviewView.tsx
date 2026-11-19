@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Star,
   Users,
 } from 'lucide-react';
 import { useOwnerBusiness } from '@/modules/business/context/OwnerBusinessContext';
@@ -439,8 +440,14 @@ export function DashboardOverviewView() {
               {
                 href: '/dashboard/enquiries',
                 title: 'Customer Enquiries',
-                desc: 'Consented lead CRM roadmap notice',
+                desc: 'Consented inbound lead management CRM',
                 icon: CalendarCheck2,
+              },
+              {
+                href: '/dashboard/reviews',
+                title: 'Customer Reviews',
+                desc: 'Inspect ratings, verified visits & publish merchant replies',
+                icon: Star,
               },
             ].map((item) => {
               const Icon = item.icon;

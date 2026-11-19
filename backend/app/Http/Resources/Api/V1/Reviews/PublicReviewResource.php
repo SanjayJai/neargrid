@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Resources\Api\V1\Reviews;
+
+use App\Domains\Reviews\Models\Review;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+/**
+ * @mixin Review
+ */
+final class PublicReviewResource extends JsonResource
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'public_id' => $this->public_id,
+            'customer_name' => $this->customer_name,
+            'rating' => $this->rating,
+            'title' => $this->title,
+            'content' => $this->content,
+            'is_verified_interaction' => (bool) $this->is_verified_interaction,
+            'owner_reply' => $this->hasOwnerReply() ? [
+                'text' => $this->owner_reply_text,
+                'replied_at' => $this->owner_replied_at?->toIso8601String(),
+            ] : null,
+            'created_at' => $this->created_at?->toIso8601String(),
+        ];
+    }
+}

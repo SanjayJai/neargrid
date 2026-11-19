@@ -617,3 +617,65 @@ export interface UpdateOwnerLeadInput {
   is_read?: boolean;
 }
 
+export interface PublicReviewDto {
+  public_id: string;
+  customer_name: string;
+  rating: number;
+  title: string | null;
+  content: string | null;
+  is_verified_interaction: boolean;
+  owner_reply: {
+    text: string;
+    replied_at: string | null;
+  } | null;
+  created_at: string;
+}
+
+export interface PublicReviewsBreakdownDto {
+  '1': number;
+  '2': number;
+  '3': number;
+  '4': number;
+  '5': number;
+}
+
+export interface OwnerReviewDto {
+  public_id: string;
+  customer_name: string;
+  rating: number;
+  title: string | null;
+  content: string | null;
+  is_verified_interaction: boolean;
+  interaction_type: string | null;
+  status: string;
+  moderation_status: string;
+  has_reply: boolean;
+  owner_reply: {
+    text: string;
+    replied_at: string | null;
+    replied_by?: {
+      public_id: string;
+      name: string | null;
+    } | null;
+  } | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubmitReviewInput {
+  customer_name: string;
+  phone_e164: string;
+  rating: number;
+  title?: string;
+  content?: string;
+}
+
+export interface SubmitReviewResult {
+  review: PublicReviewDto;
+  requires_otp: boolean;
+  challenge_id?: string | null;
+  expires_in_seconds?: number | null;
+  resend_after_seconds?: number | null;
+}
+
+

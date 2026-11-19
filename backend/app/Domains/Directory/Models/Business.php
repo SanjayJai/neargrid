@@ -9,6 +9,7 @@ use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use App\Domains\Media\Models\BusinessMedia;
 use App\Domains\Media\Models\KycDocument;
+use App\Domains\Reviews\Models\Review;
 use App\Domains\Taxonomy\Models\Amenity;
 use App\Domains\Taxonomy\Models\Category;
 use App\Domains\Taxonomy\Models\PaymentMethod;
@@ -216,6 +217,14 @@ class Business extends Model
     public function kycDocuments(): HasMany
     {
         return $this->hasMany(KycDocument::class)->latest();
+    }
+
+    /**
+     * @return HasMany<Review, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class)->latest();
     }
 
     public function isPubliclyVisible(): bool

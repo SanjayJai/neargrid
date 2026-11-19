@@ -9,6 +9,7 @@ enum OtpPurpose: string
     case Login = 'login';
     case BusinessRegister = 'business_register';
     case EnquiryVerify = 'enquiry_verify';
+    case ReviewVerify = 'review_verify';
     case PhoneChange = 'phone_change';
 
     /**

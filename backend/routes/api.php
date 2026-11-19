@@ -3,11 +3,14 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
+use App\Http\Controllers\Api\V1\Admin\AdminReviewController;
 use App\Http\Controllers\Api\V1\Auth\AccountController;
 use App\Http\Controllers\Api\V1\Auth\DeviceSessionController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\Directory\OwnerBusinessController;
+use App\Http\Controllers\Api\V1\Directory\OwnerReviewController;
 use App\Http\Controllers\Api\V1\Directory\PublicBusinessController;
+use App\Http\Controllers\Api\V1\Directory\PublicReviewController;
 use App\Http\Controllers\Api\V1\Directory\ReferenceTaxonomyController;
 use App\Http\Controllers\Api\V1\Leads\OwnerLeadController;
 use App\Http\Controllers\Api\V1\Leads\PublicEnquiryController;
@@ -29,6 +32,12 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
     // Public business profiles (only status=active, privacy-safe resource)
     Route::get('/businesses/{citySlug}/{businessSlug}', [PublicBusinessController::class, 'show'])->name('businesses.show');
+    Route::get('/businesses/{citySlug}/{businessSlug}/reviews', [PublicReviewController::class, 'index'])->name('businesses.reviews.index');
+    Route::post('/businesses/{citySlug}/{businessSlug}/reviews', [PublicReviewController::class, 'store'])->name('businesses.reviews.store');
+    Route::get('/businesses/{business}/reviews', [PublicReviewController::class, 'indexByBusiness'])->name('businesses.reviews.by-business');
+    Route::post('/businesses/{business}/reviews', [PublicReviewController::class, 'storeByBusiness'])->name('businesses.reviews.store-by-business');
+    Route::post('/reviews/{review}/verify-otp', [PublicReviewController::class, 'verifyOtp'])->name('reviews.verify-otp');
+    Route::post('/reviews/{review}/report', [PublicReviewController::class, 'report'])->name('reviews.report');
 
     // Privacy-compliant customer enquiries and contact reveals
     Route::post('/enquiries', [PublicEnquiryController::class, 'store'])->name('enquiries.store');
@@ -92,6 +101,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::get('/{business}/leads', [OwnerLeadController::class, 'index'])->name('leads.index');
             Route::patch('/{business}/leads/{lead}', [OwnerLeadController::class, 'update'])->name('leads.update');
 
+            // Business owner reviews & replies
+            Route::get('/{business}/reviews', [OwnerReviewController::class, 'index'])->name('reviews.index');
+            Route::post('/{business}/reviews/{review}/reply', [OwnerReviewController::class, 'reply'])->name('reviews.reply');
+            Route::delete('/{business}/reviews/{review}/reply', [OwnerReviewController::class, 'deleteReply'])->name('reviews.reply.delete');
+
             // Public business media management (logo, cover, gallery)
             Route::get('/{business}/media', [BusinessMediaController::class, 'index'])->name('media.index');
             Route::post('/{business}/media', [BusinessMediaController::class, 'store'])->name('media.store');
@@ -112,6 +126,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::get('/enquiries', [AdminEnquiryController::class, 'index'])->name('enquiries.index');
             Route::get('/enquiries/{enquiry}', [AdminEnquiryController::class, 'show'])->name('enquiries.show');
             Route::patch('/enquiries/{enquiry}/cancel', [AdminEnquiryController::class, 'cancel'])->name('enquiries.cancel');
+
+            Route::get('/reviews', [AdminReviewController::class, 'index'])->name('reviews.index');
+            Route::get('/reviews/{review}', [AdminReviewController::class, 'show'])->name('reviews.show');
+            Route::patch('/reviews/{review}/moderation', [AdminReviewController::class, 'moderate'])->name('reviews.moderate');
         });
 
         // Short-lived, actor-bound, signature-verified private KYC download endpoint
