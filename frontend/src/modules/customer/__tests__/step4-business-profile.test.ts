@@ -17,6 +17,7 @@ import {
   getGoogleMapsDirectionsUrl,
   getSafeWebsiteUrl,
   getTodayHoursSummary,
+  isPlaceholderDomain,
   isSafeInternalRedirectPath,
   pickBusinessLogoMedia,
   serializeSafeJsonLd,
@@ -442,9 +443,19 @@ describe('Phase 3B Milestone 8 Step 4: Live Business Profile', () => {
       expect(sanitizeInternalRedirectPath('//evil.com')).toBe('/dashboard/settings');
       expect(sanitizeInternalRedirectPath('javascript:alert(1)')).toBe('/dashboard/settings');
 
-      expect(getSafeWebsiteUrl('https://apexdental.example.in')).toBe(
+      // In test/dev mode, synthetic placeholder URLs are allowed for mock tests
+      expect(getSafeWebsiteUrl('https://apexdental.example.in', { allowPlaceholders: true })).toBe(
         'https://apexdental.example.in/'
       );
+      // In production mode, placeholder URLs cannot appear on real public business profiles
+      expect(getSafeWebsiteUrl('https://apexdental.example.in', { allowPlaceholders: false })).toBeNull();
+      expect(getSafeWebsiteUrl('https://www.apexdentalchennai.com', { allowPlaceholders: false })).toBe(
+        'https://www.apexdentalchennai.com/'
+      );
+      expect(isPlaceholderDomain('apexdental.example.in')).toBe(true);
+      expect(isPlaceholderDomain('test.example.com')).toBe(true);
+      expect(isPlaceholderDomain('demo.invalid')).toBe(true);
+      expect(isPlaceholderDomain('www.apexdentalchennai.com')).toBe(false);
       expect(getSafeWebsiteUrl('javascript:alert(1)')).toBeNull();
 
       expect(getGoogleMapsDirectionsUrl({ lat: 13.0418, lng: 80.2341 })).toContain(

@@ -86,17 +86,51 @@ export function isSafeInternalRedirectPath(path?: string | null): path is string
 }
 
 /**
- * Validates public website URLs to strictly allow http(s) schemes (blocks javascript:/data:).
+ * Checks whether a hostname belongs to an RFC 2606 / RFC 6761 reserved test domain
+ * or known placeholder/sample domain (e.g. *.example.in, *.example.com, *.test, *.invalid, *.localhost).
  */
-export function getSafeWebsiteUrl(raw?: string | null): string | null {
+export function isPlaceholderDomain(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === 'example.com' ||
+    host.endsWith('.example.com') ||
+    host === 'example.org' ||
+    host.endsWith('.example.org') ||
+    host === 'example.net' ||
+    host.endsWith('.example.net') ||
+    host === 'example.in' ||
+    host.endsWith('.example.in') ||
+    host === 'example' ||
+    host.endsWith('.example') ||
+    host.endsWith('.test') ||
+    host.endsWith('.invalid') ||
+    host === 'localhost' ||
+    host.endsWith('.localhost')
+  );
+}
+
+/**
+ * Validates public website URLs to strictly allow http(s) schemes (blocks javascript:/data:).
+ * In production environments, placeholder/test domains (e.g. *.example.in, *.example.com)
+ * are rejected so that dummy or sample data never surfaces on real public business profiles.
+ */
+export function getSafeWebsiteUrl(
+  raw?: string | null,
+  options?: { allowPlaceholders?: boolean }
+): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   try {
     const parsed = new URL(trimmed);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return parsed.toString();
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
     }
-    return null;
+    const allowPlaceholders =
+      options?.allowPlaceholders ?? process.env.NODE_ENV !== 'production';
+    if (!allowPlaceholders && isPlaceholderDomain(parsed.hostname)) {
+      return null;
+    }
+    return parsed.toString();
   } catch {
     return null;
   }

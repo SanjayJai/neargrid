@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  getSafeWebsiteUrl,
+  isPlaceholderDomain,
+} from '@/modules/customer/lib/business-profile';
 import type {
   PublicBusinessProfileDto,
   SearchBusinessHitDto,
@@ -170,7 +174,7 @@ describe('Phase 3B Step 6 — End-to-End Integration and Business Workflow Verif
       const contact = {
         primary_phone_e164: '+919840123456',
         whatsapp_e164: '+919840123456',
-        website_url: 'https://apexdental.example.in',
+        website_url: 'https://www.apexdentalchennai.com',
       };
 
       const telUrl = `tel:${contact.primary_phone_e164}`;
@@ -180,6 +184,13 @@ describe('Phase 3B Step 6 — End-to-End Integration and Business Workflow Verif
       expect(telUrl).toBe('tel:+919840123456');
       expect(waUrl).toBe('https://wa.me/919840123456?text=Hello%20Apex%20Dental%20Studio%2C%20I%20found%20your%20listing%20on%20NearGrid.');
       expect(contact.website_url).toMatch(/^https:\/\//);
+
+      // Confirm placeholder URLs are detected and rejected on real public profiles in production
+      expect(isPlaceholderDomain('apexdental.example.in')).toBe(true);
+      expect(getSafeWebsiteUrl('https://apexdental.example.in', { allowPlaceholders: false })).toBeNull();
+      expect(getSafeWebsiteUrl('https://www.apexdentalchennai.com', { allowPlaceholders: false })).toBe(
+        'https://www.apexdentalchennai.com/'
+      );
     });
   });
 
