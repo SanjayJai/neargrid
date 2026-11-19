@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\Directory\OwnerBusinessController;
 use App\Http\Controllers\Api\V1\Directory\PublicBusinessController;
 use App\Http\Controllers\Api\V1\Directory\ReferenceTaxonomyController;
+use App\Http\Controllers\Api\V1\Leads\OwnerLeadController;
 use App\Http\Controllers\Api\V1\Leads\PublicEnquiryController;
 use App\Http\Controllers\Api\V1\Media\BusinessMediaController;
 use App\Http\Controllers\Api\V1\Media\KycDocumentController;
@@ -86,6 +87,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
             Route::get('/{business}/verifications', [OwnerBusinessController::class, 'indexVerifications'])->name('verifications.index');
             Route::post('/{business}/verifications', [OwnerBusinessController::class, 'storeVerification'])->name('verifications.store');
+
+            // Inbound CRM lead management & staff assignments
+            Route::get('/{business}/leads', [OwnerLeadController::class, 'index'])->name('leads.index');
+            Route::patch('/{business}/leads/{lead}', [OwnerLeadController::class, 'update'])->name('leads.update');
 
             // Public business media management (logo, cover, gallery)
             Route::get('/{business}/media', [BusinessMediaController::class, 'index'])->name('media.index');

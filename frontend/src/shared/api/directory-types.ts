@@ -562,3 +562,58 @@ export interface SubmitVerificationInput {
   document_number: string;
   private_file_path: string;
 }
+
+// ---------------------------------------------------------------------------
+// Inbound CRM Leads (Phase 3C Milestone 2)
+// ---------------------------------------------------------------------------
+
+export type LeadStatusDto = 'new' | 'contacted' | 'converted' | 'archived';
+
+export interface OwnerLeadDto {
+  public_id: string;
+  lead_status: LeadStatusDto;
+  delivery_channel: string;
+  delivery_status: string;
+  delivery_timestamp: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  contacted_at: string | null;
+  merchant_notes: string | null;
+  assigned_user: {
+    public_id: string;
+    name: string | null;
+    email: string | null;
+  } | null;
+  enquiry: {
+    public_id: string;
+    customer_name: string;
+    phone_e164: string;
+    email: string | null;
+    requirement: string;
+    urgency: 'immediate' | 'within_week' | 'flexible';
+    enquiry_type: 'direct' | 'broadcast';
+    category: {
+      name: string;
+      slug: string;
+    };
+    city: {
+      name: string;
+      slug: string;
+    };
+    locality: {
+      name: string;
+      slug: string;
+    } | null;
+    created_at: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateOwnerLeadInput {
+  lead_status?: LeadStatusDto;
+  assigned_user_public_id?: string | null;
+  merchant_notes?: string | null;
+  is_read?: boolean;
+}
+

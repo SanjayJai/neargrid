@@ -2,6 +2,15 @@ export interface ApiMeta {
   request_id: string | null;
   api_version: string;
   timestamp: string;
+  pagination?: {
+    type?: string;
+    next_cursor?: string | null;
+    prev_cursor?: string | null;
+    current_page?: number;
+    per_page?: number;
+    total?: number;
+    last_page?: number;
+  };
 }
 
 export interface ApiSuccessEnvelope<T> {

@@ -84,12 +84,14 @@ describe('Step 5 — Live Business Owner Dashboard Guardrails', () => {
     expect(content).toContain('my_membership?.is_owner');
   });
 
-  it('verifies honest Phase 3C notice on enquiries page without fake lead dispatch', () => {
+  it('verifies live CRM lead management on enquiries page connected to real APIs without mock leads', () => {
     const enquiriesPagePath = path.join(businessAppDir, 'dashboard/enquiries/page.tsx');
     const content = fs.readFileSync(enquiriesPagePath, 'utf8');
 
-    expect(content).toContain('Phase 3C Feature Preview');
-    expect(content).toContain('Consented Inbound Lead CRM in Active Development');
-    expect(content).toContain('Digital Personal Data Protection');
+    expect(content).toContain('Inbound Customer Leads &amp; CRM');
+    expect(content).toContain('/api/owner/businesses/');
+    expect(content).toContain('/leads');
+    expect(content).not.toContain('DEMO_ENQUIRIES');
+    expect(content).not.toContain('DEMO_BUSINESSES');
   });
 });

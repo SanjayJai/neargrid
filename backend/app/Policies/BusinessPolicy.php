@@ -64,6 +64,24 @@ final class BusinessPolicy
         return $business->activeMemberFor($actor)?->hasCapability('verification.submit') ?? false;
     }
 
+    public function viewLeads(User $actor, Business $business): bool
+    {
+        if ($business->isOwnedBy($actor)) {
+            return true;
+        }
+
+        return $business->activeMemberFor($actor)?->hasCapability('leads.manage') ?? false;
+    }
+
+    public function manageLeads(User $actor, Business $business): bool
+    {
+        if ($business->isOwnedBy($actor)) {
+            return true;
+        }
+
+        return $business->activeMemberFor($actor)?->hasCapability('leads.manage') ?? false;
+    }
+
     public function manageStaff(User $actor, Business $business): bool
     {
         return $business->isOwnedBy($actor);
