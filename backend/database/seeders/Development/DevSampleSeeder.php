@@ -59,6 +59,19 @@ class DevSampleSeeder extends Seeder
             if ($role !== null) {
                 $user->roles()->syncWithoutDetaching([$role->id]);
             }
+
+            if ($sample['role'] === 'business_owner') {
+                $biz = \App\Domains\Directory\Models\Business::first();
+                if ($biz !== null) {
+                    $biz->owner_user_id = $user->id;
+                    $biz->is_claimed = true;
+                    $biz->is_verified = true;
+                    $biz->verified_at = now();
+                    $biz->is_trusted = true;
+                    $biz->completeness_score = 85;
+                    $biz->save();
+                }
+            }
         }
     }
 }
