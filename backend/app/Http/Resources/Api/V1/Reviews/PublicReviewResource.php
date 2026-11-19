@@ -25,6 +25,9 @@ final class PublicReviewResource extends JsonResource
             'title' => $this->title,
             'content' => $this->content,
             'is_verified_interaction' => (bool) $this->is_verified_interaction,
+            'trust_badge' => $this->trust_badge instanceof \App\Domains\Reviews\Enums\ReviewTrustBadge
+                ? $this->trust_badge->value
+                : ($this->trust_badge ?? 'none'),
             'owner_reply' => $this->hasOwnerReply() ? [
                 'text' => $this->owner_reply_text,
                 'replied_at' => $this->owner_replied_at?->toIso8601String(),

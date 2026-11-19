@@ -25,6 +25,9 @@ final class OwnerReviewResource extends JsonResource
             'title' => $this->title,
             'content' => $this->content,
             'is_verified_interaction' => (bool) $this->is_verified_interaction,
+            'trust_badge' => $this->trust_badge instanceof \App\Domains\Reviews\Enums\ReviewTrustBadge
+                ? $this->trust_badge->value
+                : ($this->trust_badge ?? 'none'),
             'interaction_type' => $this->interaction_type,
             'status' => $this->status->value,
             'moderation_status' => $this->moderation_status->value,

@@ -406,12 +406,17 @@ export function CustomerReviewsSection({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-ink">{rev.customer_name}</span>
-                      {rev.is_verified_interaction && (
+                      {rev.trust_badge === 'verified_customer' ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                           <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                           Verified Customer
                         </span>
-                      )}
+                      ) : rev.trust_badge === 'verified_lead' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
+                          Verified Lead
+                        </span>
+                      ) : null}
                     </div>
                     <time className="text-xs text-ink-muted">
                       {new Date(rev.created_at).toLocaleDateString('en-IN', {

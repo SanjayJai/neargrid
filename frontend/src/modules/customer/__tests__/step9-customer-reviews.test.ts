@@ -341,5 +341,18 @@ describe('Phase 3C Milestone 3: Customer Reviews, Bayesian Ratings & Owner Repli
         expect.objectContaining({ method: 'GET' })
       );
     });
+
+    it('implements verified customer and verified lead trust badges in customer review section', () => {
+      const sectionPath = path.join(
+        FRONTEND_SRC,
+        'modules/customer/components/CustomerReviewsSection.tsx'
+      );
+      const code = fs.readFileSync(sectionPath, 'utf-8');
+
+      expect(code).toContain("rev.trust_badge === 'verified_customer'");
+      expect(code).toContain('Verified Customer');
+      expect(code).toContain("rev.trust_badge === 'verified_lead'");
+      expect(code).toContain('Verified Lead');
+    });
   });
 });

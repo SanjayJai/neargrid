@@ -6,19 +6,25 @@ namespace App\Domains\Reviews\Services;
 
 use App\Domains\Directory\Enums\BusinessStatus;
 use App\Domains\Directory\Models\Business;
+use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Governance\Services\AuditLogger;
 use App\Domains\Identity\Enums\OtpPurpose;
 use App\Domains\Identity\Services\OtpChallengeService;
 use App\Domains\Identity\Support\PhoneNormalizer;
-use App\Domains\Leads\Models\ContactReveal;
+use App\Domains\Leads\Enums\EnquiryStatus;
+use App\Domains\Leads\Enums\LeadStatus;
 use App\Domains\Leads\Models\Enquiry;
+use App\Domains\Leads\Models\EnquiryRecipient;
 use App\Domains\Reviews\Enums\ReviewModerationStatus;
 use App\Domains\Reviews\Enums\ReviewStatus;
+use App\Domains\Reviews\Enums\ReviewTrustBadge;
 use App\Domains\Reviews\Exceptions\ReviewException;
 use App\Domains\Reviews\Models\Review;
 use App\Domains\Reviews\Models\ReviewReport;
 use App\Models\User;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -55,7 +61,62 @@ final class ReviewManagementService
             );
         }
 
-        // Anti-shill rule: owner or active team members cannot review their own business
+        $phoneE164 = PhoneNormalizer::normalizeAndValidate($data['phone_e164']);
+        $ipHash = hash('sha256', $ipAddress);
+
+        // Normalize atomic lock key: shared across authenticated and guest submissions.
+        // Lock key is bound to the target business and the normalized reviewer phone.
+        $phoneLockKey = "review_lock:biz_{$business->id}:phone_{$phoneE164}";
+
+        try {
+            $lock = Cache::lock($phoneLockKey, 10);
+
+            return $lock->block(2, function () use ($business, $data, $actor, $ipAddress, $phoneE164, $ipHash): array {
+                // If authenticated, also acquire user-scoped lock to prevent concurrent submissions with alternate phone
+                if ($actor !== null) {
+                    $userLock = Cache::lock("review_lock:biz_{$business->id}:user_{$actor->id}", 10);
+
+                    return $userLock->block(2, function () use ($business, $data, $actor, $ipAddress, $phoneE164, $ipHash): array {
+                        return $this->processSubmissionWithinLock($business, $data, $actor, $ipAddress, $phoneE164, $ipHash);
+                    });
+                }
+
+                return $this->processSubmissionWithinLock($business, $data, $actor, $ipAddress, $phoneE164, $ipHash);
+            });
+        } catch (LockTimeoutException) {
+            throw new ReviewException(
+                'CONCURRENT_SUBMISSION',
+                'A review submission is currently being processed. Please wait a moment.',
+                Response::HTTP_CONFLICT
+            );
+        }
+    }
+
+    /**
+     * @param  array{
+     *   customer_name: string,
+     *   phone_e164: string,
+     *   rating: int,
+     *   title?: ?string,
+     *   content?: ?string,
+     * }  $data
+     * @return array{
+     *   review: Review,
+     *   requires_otp: bool,
+     *   challenge_id?: string,
+     *   expires_in_seconds?: int,
+     *   resend_after_seconds?: int,
+     * }
+     */
+    private function processSubmissionWithinLock(
+        Business $business,
+        array $data,
+        ?User $actor,
+        string $ipAddress,
+        string $phoneE164,
+        string $ipHash
+    ): array {
+        // Anti-shill rule 1: Authenticated owner or active staff member cannot review their own business
         if ($actor !== null) {
             $isAssociated = $business->isOwnedBy($actor) || $business->activeMemberFor($actor) !== null;
             if ($isAssociated) {
@@ -67,8 +128,41 @@ final class ReviewManagementService
             }
         }
 
-        $phoneE164 = PhoneNormalizer::normalizeAndValidate($data['phone_e164']);
-        $ipHash = hash('sha256', $ipAddress);
+        // Anti-shill rule 2: Normalized phone matches business primary phone
+        if ($business->primary_phone_e164 !== null && $business->primary_phone_e164 === $phoneE164) {
+            throw new ReviewException(
+                'CANNOT_REVIEW_OWN_BUSINESS',
+                'Reviews cannot be submitted using the business primary phone number.',
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        // Anti-shill rule 3: Normalized phone belongs to the business owner
+        $owner = $business->owner;
+        if ($owner !== null && $owner->phone_e164 !== null && $owner->phone_e164 === $phoneE164) {
+            throw new ReviewException(
+                'CANNOT_REVIEW_OWN_BUSINESS',
+                'Business owners and team members cannot review their own business.',
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        // Anti-shill rule 4: Normalized phone belongs to an active staff member of the business
+        $isStaffPhone = BusinessMember::query()
+            ->where('business_id', $business->id)
+            ->where('status', 'active')
+            ->whereHas('user', function ($u) use ($phoneE164): void {
+                $u->where('phone_e164', $phoneE164);
+            })
+            ->exists();
+
+        if ($isStaffPhone) {
+            throw new ReviewException(
+                'CANNOT_REVIEW_OWN_BUSINESS',
+                'Business owners and team members cannot review their own business.',
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
 
         // One-review-per-business 30-day duplicate protection
         $thirtyDaysAgo = now()->subDays(30);
@@ -105,15 +199,15 @@ final class ReviewManagementService
             );
         }
 
-        // Eligibility check for Verified Customer badge
-        $verifiedInteraction = $this->resolveVerifiedInteraction($business, $actor, $phoneE164);
+        // Trust badge determination (Verified Customer, Verified Lead, or None)
+        $trustResolution = $this->resolveVerifiedInteraction($business, $actor, $phoneE164);
 
         $rating = max(1, min(5, (int) $data['rating']));
         $title = isset($data['title']) && trim((string) $data['title']) !== '' ? trim((string) $data['title']) : null;
         $content = isset($data['content']) && trim((string) $data['content']) !== '' ? trim((string) $data['content']) : null;
 
         if ($actor !== null) {
-            // Authenticated customer: auto-publish immediately
+            // Authenticated customer: auto-publish immediately (documented post-moderation policy)
             $review = Review::query()->create([
                 'business_id' => $business->id,
                 'user_id' => $actor->id,
@@ -122,9 +216,10 @@ final class ReviewManagementService
                 'rating' => $rating,
                 'title' => $title,
                 'content' => $content,
-                'is_verified_interaction' => $verifiedInteraction['is_verified'],
-                'interaction_type' => $verifiedInteraction['type'],
-                'interaction_id' => $verifiedInteraction['id'],
+                'is_verified_interaction' => $trustResolution['is_verified'],
+                'trust_badge' => $trustResolution['trust_badge'],
+                'interaction_type' => $trustResolution['type'],
+                'interaction_id' => $trustResolution['id'],
                 'status' => ReviewStatus::Published,
                 'moderation_status' => ReviewModerationStatus::Approved,
                 'phone_verified_at' => now(),
@@ -154,9 +249,10 @@ final class ReviewManagementService
             'rating' => $rating,
             'title' => $title,
             'content' => $content,
-            'is_verified_interaction' => $verifiedInteraction['is_verified'],
-            'interaction_type' => $verifiedInteraction['type'],
-            'interaction_id' => $verifiedInteraction['id'],
+            'is_verified_interaction' => $trustResolution['is_verified'],
+            'trust_badge' => $trustResolution['trust_badge'],
+            'interaction_type' => $trustResolution['type'],
+            'interaction_id' => $trustResolution['id'],
             'status' => ReviewStatus::PendingVerification,
             'moderation_status' => ReviewModerationStatus::Pending,
             'otp_challenge_id' => $otpRecord?->id,
@@ -223,6 +319,7 @@ final class ReviewManagementService
         $priorMean = (float) config('search.ranking.bayesian.prior_mean', 3.5);
         $priorWeight = (float) config('search.ranking.bayesian.prior_weight', 10);
 
+        // When count === 0, bayesian_score is aligned to the 3.5 baseline, while rating_avg is 0.00
         $bayesianScore = $count > 0
             ? (($count * $avg) + ($priorWeight * $priorMean)) / ($count + $priorWeight)
             : $priorMean;
@@ -352,13 +449,69 @@ final class ReviewManagementService
     }
 
     /**
-     * @return array{is_verified: bool, type: ?string, id: ?int}
+     * @return array{is_verified: bool, trust_badge: ReviewTrustBadge, type: ?string, id: ?int}
      */
     private function resolveVerifiedInteraction(Business $business, ?User $actor, string $phoneE164): array
     {
-        // 1. Check for verified Enquiry targeting this business or dispatched as recipient
-        $enquiryQuery = Enquiry::query()
+        // 1. Confirmed Completed / Converted Interaction -> Verified Customer
+        // The reviewer must have an EnquiryRecipient for this business where lead_status is Converted.
+        $convertedRecipient = EnquiryRecipient::query()
+            ->where('business_id', $business->id)
+            ->where('lead_status', LeadStatus::Converted->value)
+            ->whereHas('enquiry', function ($eq) use ($actor, $phoneE164): void {
+                $eq->whereNotNull('phone_verified_at')
+                    ->where(function ($q) use ($actor, $phoneE164): void {
+                        if ($actor !== null) {
+                            $q->where('user_id', $actor->id)->orWhere('phone_e164', $phoneE164);
+                        } else {
+                            $q->where('phone_e164', $phoneE164);
+                        }
+                    });
+            })
+            ->latest('id')
+            ->first();
+
+        if ($convertedRecipient !== null) {
+            return [
+                'is_verified' => true,
+                'trust_badge' => ReviewTrustBadge::VerifiedCustomer,
+                'type' => 'enquiry_converted',
+                'id' => $convertedRecipient->enquiry_id,
+            ];
+        }
+
+        // 2. Qualifying Verified Enquiry (Direct or Dispatched Lead, active, not cancelled/archived) -> Verified Lead
+        $verifiedLeadRecipient = EnquiryRecipient::query()
+            ->where('business_id', $business->id)
+            ->whereNotIn('lead_status', [LeadStatus::Archived->value])
+            ->whereHas('enquiry', function ($eq) use ($actor, $phoneE164): void {
+                $eq->whereNotNull('phone_verified_at')
+                    ->where('status', '!=', EnquiryStatus::Cancelled->value)
+                    ->where(function ($q) use ($actor, $phoneE164): void {
+                        if ($actor !== null) {
+                            $q->where('user_id', $actor->id)->orWhere('phone_e164', $phoneE164);
+                        } else {
+                            $q->where('phone_e164', $phoneE164);
+                        }
+                    });
+            })
+            ->latest('id')
+            ->first();
+
+        if ($verifiedLeadRecipient !== null) {
+            return [
+                'is_verified' => false,
+                'trust_badge' => ReviewTrustBadge::VerifiedLead,
+                'type' => 'enquiry_lead',
+                'id' => $verifiedLeadRecipient->enquiry_id,
+            ];
+        }
+
+        // Direct enquiry without recipient record yet (e.g. pending dispatch worker)
+        $directEnquiry = Enquiry::query()
+            ->where('target_business_id', $business->id)
             ->whereNotNull('phone_verified_at')
+            ->where('status', '!=', EnquiryStatus::Cancelled->value)
             ->where(function ($q) use ($actor, $phoneE164): void {
                 if ($actor !== null) {
                     $q->where('user_id', $actor->id)->orWhere('phone_e164', $phoneE164);
@@ -366,45 +519,23 @@ final class ReviewManagementService
                     $q->where('phone_e164', $phoneE164);
                 }
             })
-            ->where(function ($q) use ($business): void {
-                $q->where('target_business_id', $business->id)
-                    ->orWhereHas('recipients', function ($r) use ($business): void {
-                        $r->where('business_id', $business->id);
-                    });
-            })
             ->latest('id')
             ->first();
 
-        if ($enquiryQuery !== null) {
+        if ($directEnquiry !== null) {
             return [
-                'is_verified' => true,
-                'type' => 'enquiry',
-                'id' => $enquiryQuery->id,
+                'is_verified' => false,
+                'trust_badge' => ReviewTrustBadge::VerifiedLead,
+                'type' => 'enquiry_lead',
+                'id' => $directEnquiry->id,
             ];
         }
 
-        // 2. Check for ContactReveal interaction
-        $revealQuery = ContactReveal::query()
-            ->where('business_id', $business->id)
-            ->where(function ($q) use ($actor, $phoneE164): void {
-                if ($actor !== null) {
-                    $q->where('user_id', $actor->id);
-                }
-                // Phone is checked via user if known
-            })
-            ->latest('id')
-            ->first();
-
-        if ($revealQuery !== null) {
-            return [
-                'is_verified' => true,
-                'type' => 'contact_reveal',
-                'id' => $revealQuery->id,
-            ];
-        }
-
+        // 3. Contact reveal alone NEVER qualifies for a badge
+        // Contact reveal records unmasked phone on profile, not a verified transaction or verified lead.
         return [
             'is_verified' => false,
+            'trust_badge' => ReviewTrustBadge::None,
             'type' => null,
             'id' => null,
         ];

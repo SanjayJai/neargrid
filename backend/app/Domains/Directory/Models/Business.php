@@ -60,6 +60,18 @@ class Business extends Model
     /** @use HasFactory<BusinessFactory> */
     use HasFactory, HasPublicUlid, HasSpatialCenterPoint, SoftDeletes;
 
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => 'draft',
+        'is_claimed' => false,
+        'is_verified' => false,
+        'rating_avg' => 0.00,
+        'review_count' => 0,
+        'bayesian_score' => 3.500,
+    ];
+
     protected static function newFactory(): BusinessFactory
     {
         return BusinessFactory::new();

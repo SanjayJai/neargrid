@@ -12,16 +12,21 @@ use App\Domains\Governance\Models\AuditLog;
 use App\Domains\Identity\Contracts\OtpSender;
 use App\Domains\Identity\Models\Role;
 use App\Domains\Leads\Enums\EnquiryStatus;
+use App\Domains\Leads\Enums\LeadStatus;
+use App\Domains\Leads\Models\ContactReveal;
 use App\Domains\Leads\Models\Enquiry;
+use App\Domains\Leads\Models\EnquiryRecipient;
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use App\Domains\Reviews\Enums\ReviewModerationStatus;
 use App\Domains\Reviews\Enums\ReviewStatus;
+use App\Domains\Reviews\Enums\ReviewTrustBadge;
 use App\Domains\Reviews\Models\Review;
 use App\Domains\Taxonomy\Models\Category;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\Fakes\FakeOtpSender;
 use Tests\TestCase;
 
@@ -52,7 +57,7 @@ final class CustomerReviewsAndModerationTest extends TestCase
         $this->category = Category::query()->where('slug', 'dentists')->firstOrFail();
         $locality = Locality::query()->where('city_id', $this->city->id)->firstOrFail();
 
-        $this->ownerA = User::factory()->create();
+        $this->ownerA = User::factory()->create(['phone_e164' => '+919840111999']);
         $this->businessA = new Business([
             'primary_category_id' => $this->category->id,
             'city_id' => $this->city->id,
@@ -71,7 +76,7 @@ final class CustomerReviewsAndModerationTest extends TestCase
         $this->businessA->is_verified = true;
         $this->businessA->save();
 
-        $this->ownerB = User::factory()->create();
+        $this->ownerB = User::factory()->create(['phone_e164' => '+919840333999']);
         $this->businessB = new Business([
             'primary_category_id' => $this->category->id,
             'city_id' => $this->city->id,
@@ -91,7 +96,7 @@ final class CustomerReviewsAndModerationTest extends TestCase
         $this->businessB->save();
 
         // Staff for Business A
-        $this->leadAgentA = User::factory()->create(['name' => 'Agent Priya']);
+        $this->leadAgentA = User::factory()->create(['name' => 'Agent Priya', 'phone_e164' => '+919840999555']);
         BusinessMember::query()->create([
             'business_id' => $this->businessA->id,
             'user_id' => $this->leadAgentA->id,
@@ -100,7 +105,7 @@ final class CustomerReviewsAndModerationTest extends TestCase
             'permissions' => BusinessMemberRole::LeadAgent->defaultCapabilities(),
         ]);
 
-        $this->editorA = User::factory()->create(['name' => 'Editor Vikram']);
+        $this->editorA = User::factory()->create(['name' => 'Editor Vikram', 'phone_e164' => '+919840999666']);
         BusinessMember::query()->create([
             'business_id' => $this->businessA->id,
             'user_id' => $this->editorA->id,
@@ -135,7 +140,8 @@ final class CustomerReviewsAndModerationTest extends TestCase
             ->assertJsonPath('data.requires_otp', false)
             ->assertJsonPath('data.review.rating', 5)
             ->assertJsonPath('data.review.title', 'Pain-free root canal treatment!')
-            ->assertJsonPath('data.review.is_verified_interaction', false);
+            ->assertJsonPath('data.review.is_verified_interaction', false)
+            ->assertJsonPath('data.review.trust_badge', 'none');
 
         // Verify database state and Bayesian score
         $this->businessA->refresh();
@@ -170,7 +176,8 @@ final class CustomerReviewsAndModerationTest extends TestCase
         ]);
 
         $submitRes->assertStatus(201)
-            ->assertJsonPath('data.requires_otp', true);
+            ->assertJsonPath('data.requires_otp', true)
+            ->assertJsonPath('data.review.trust_badge', 'none');
 
         $this->assertNotNull($submitRes->json('data.challenge_id'));
         $reviewUlid = $submitRes->json('data.review.public_id');
@@ -208,20 +215,20 @@ final class CustomerReviewsAndModerationTest extends TestCase
         $listAfter->assertStatus(200)->assertJsonCount(1, 'data');
     }
 
-    public function test_verified_interaction_is_detected_from_previous_enquiry(): void
+    public function test_verified_interaction_distinguishes_verified_customer_and_verified_lead_and_contact_reveal(): void
     {
-        $customer = User::factory()->create(['phone_e164' => '+919840777333']);
-        $token = $customer->createToken('customer-token')->plainTextToken;
+        // 1. Customer with converted enquiry gets "Verified Customer" badge
+        $convertedCustomer = User::factory()->create(['phone_e164' => '+919840777111']);
+        $convertedToken = $convertedCustomer->createToken('token-converted')->plainTextToken;
 
-        // Create verified enquiry targeting Business A
-        Enquiry::query()->create([
-            'user_id' => $customer->id,
+        $convertedEnquiry = Enquiry::query()->create([
+            'user_id' => $convertedCustomer->id,
             'category_id' => $this->category->id,
             'city_id' => $this->city->id,
             'target_business_id' => $this->businessA->id,
-            'customer_name' => 'Verified Customer Karthik',
-            'phone_e164' => '+919840777333',
-            'requirement' => 'Need dental crown replacement.',
+            'customer_name' => 'Converted Customer Anita',
+            'phone_e164' => '+919840777111',
+            'requirement' => 'Root canal completed.',
             'status' => EnquiryStatus::Active,
             'consent_given' => true,
             'consent_version' => '2026.1',
@@ -231,21 +238,101 @@ final class CustomerReviewsAndModerationTest extends TestCase
             'phone_verified_at' => now(),
         ]);
 
-        $res = $this->withHeader('Authorization', "Bearer {$token}")
+        EnquiryRecipient::query()->create([
+            'enquiry_id' => $convertedEnquiry->id,
+            'business_id' => $this->businessA->id,
+            'lead_status' => LeadStatus::Converted,
+            'delivery_channel' => 'in_app',
+            'delivery_status' => 'delivered',
+            'delivery_timestamp' => now(),
+        ]);
+
+        $convertedRes = $this->withHeader('Authorization', "Bearer {$convertedToken}")
             ->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
-                'customer_name' => 'Karthik',
-                'phone_e164' => '+919840777333',
+                'customer_name' => 'Anita',
+                'phone_e164' => '+919840777111',
                 'rating' => 5,
-                'content' => 'Crown was fitted perfectly. Excellent work!',
+                'content' => 'Completed root canal treatment with excellent care.',
             ]);
 
-        $res->assertStatus(201)
-            ->assertJsonPath('data.review.is_verified_interaction', true);
+        $convertedRes->assertStatus(201)
+            ->assertJsonPath('data.review.is_verified_interaction', true)
+            ->assertJsonPath('data.review.trust_badge', 'verified_customer');
+
+        $this->app['auth']->forgetGuards();
+
+        // 2. Customer with active (unconverted) enquiry gets "Verified Lead" badge
+        $leadCustomer = User::factory()->create(['phone_e164' => '+919840777222']);
+        $leadToken = $leadCustomer->createToken('token-lead')->plainTextToken;
+
+        $leadEnquiry = Enquiry::query()->create([
+            'user_id' => $leadCustomer->id,
+            'category_id' => $this->category->id,
+            'city_id' => $this->city->id,
+            'target_business_id' => $this->businessA->id,
+            'customer_name' => 'Lead Customer Rahul',
+            'phone_e164' => '+919840777222',
+            'requirement' => 'Enquiry for dental braces pricing.',
+            'status' => EnquiryStatus::Active,
+            'consent_given' => true,
+            'consent_version' => '2026.1',
+            'consent_text' => 'Direct consent',
+            'consent_timestamp' => now(),
+            'ip_address_hash' => hash('sha256', '127.0.0.1'),
+            'phone_verified_at' => now(),
+        ]);
+
+        EnquiryRecipient::query()->create([
+            'enquiry_id' => $leadEnquiry->id,
+            'business_id' => $this->businessA->id,
+            'lead_status' => LeadStatus::Contacted, // Contacted but not yet converted
+            'delivery_channel' => 'in_app',
+            'delivery_status' => 'delivered',
+            'delivery_timestamp' => now(),
+        ]);
+
+        $leadRes = $this->withHeader('Authorization', "Bearer {$leadToken}")
+            ->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+                'customer_name' => 'Rahul',
+                'phone_e164' => '+919840777222',
+                'rating' => 4,
+                'content' => 'Doctor responded quickly to my consultation request.',
+            ]);
+
+        $leadRes->assertStatus(201)
+            ->assertJsonPath('data.review.is_verified_interaction', false)
+            ->assertJsonPath('data.review.trust_badge', 'verified_lead');
+
+        $this->app['auth']->forgetGuards();
+
+        // 3. Customer with contact reveal alone receives NO badge ('none')
+        $revealCustomer = User::factory()->create(['phone_e164' => '+919840777333']);
+        $revealToken = $revealCustomer->createToken('token-reveal')->plainTextToken;
+
+        ContactReveal::query()->create([
+            'business_id' => $this->businessA->id,
+            'user_id' => $revealCustomer->id,
+            'ip_address_hash' => hash('sha256', '127.0.0.1'),
+            'user_agent' => 'Mozilla/5.0 Test',
+            'channel' => 'phone',
+        ]);
+
+        $revealRes = $this->withHeader('Authorization', "Bearer {$revealToken}")
+            ->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+                'customer_name' => 'Suresh',
+                'phone_e164' => '+919840777333',
+                'rating' => 4,
+                'content' => 'I called the clinic number directly.',
+            ]);
+
+        $revealRes->assertStatus(201)
+            ->assertJsonPath('data.review.is_verified_interaction', false)
+            ->assertJsonPath('data.review.trust_badge', 'none');
     }
 
-    public function test_anti_shill_rule_blocks_business_owner_and_staff_from_reviewing_own_business(): void
+    public function test_anti_shill_rule_blocks_owners_and_staff_authenticated_and_guest(): void
     {
-        // Owner A attempts to review Business A
+        // 1. Owner A attempts authenticated review -> 422
         $ownerToken = $this->ownerA->createToken('owner-token')->plainTextToken;
         $ownerRes = $this->withHeader('Authorization', "Bearer {$ownerToken}")
             ->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
@@ -258,8 +345,9 @@ final class CustomerReviewsAndModerationTest extends TestCase
             ->assertJsonPath('error.code', 'CANNOT_REVIEW_OWN_BUSINESS');
 
         $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
 
-        // Staff member (Agent Priya) attempts to review Business A
+        // 2. Staff member (Lead Agent) attempts authenticated review -> 422
         $agentToken = $this->leadAgentA->createToken('agent-token')->plainTextToken;
         $agentRes = $this->withHeader('Authorization', "Bearer {$agentToken}")
             ->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
@@ -270,6 +358,99 @@ final class CustomerReviewsAndModerationTest extends TestCase
             ]);
         $agentRes->assertStatus(422)
             ->assertJsonPath('error.code', 'CANNOT_REVIEW_OWN_BUSINESS');
+
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
+
+        // 3. Guest using business primary phone -> 422
+        $bizPhoneRes = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Guest with Business Phone',
+            'phone_e164' => $this->businessA->primary_phone_e164,
+            'rating' => 5,
+            'content' => 'Review using business phone number.',
+        ]);
+        $bizPhoneRes->assertStatus(422)
+            ->assertJsonPath('error.code', 'CANNOT_REVIEW_OWN_BUSINESS');
+
+        // 4. Guest using business owner phone -> 422
+        $ownerPhoneRes = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Guest with Owner Phone',
+            'phone_e164' => $this->ownerA->phone_e164,
+            'rating' => 5,
+            'content' => 'Review using owner personal phone.',
+        ]);
+        $ownerPhoneRes->assertStatus(422)
+            ->assertJsonPath('error.code', 'CANNOT_REVIEW_OWN_BUSINESS');
+
+        // 5. Guest using staff member phone -> 422
+        $staffPhoneRes = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Guest with Staff Phone',
+            'phone_e164' => $this->editorA->phone_e164,
+            'rating' => 5,
+            'content' => 'Review using editor staff phone.',
+        ]);
+        $staffPhoneRes->assertStatus(422)
+            ->assertJsonPath('error.code', 'CANNOT_REVIEW_OWN_BUSINESS');
+
+        // 6. Legitimate unrelated guest -> allowed (triggers OTP challenge)
+        $legitGuestRes = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Legitimate Guest Senthil',
+            'phone_e164' => '+919840999000',
+            'rating' => 5,
+            'content' => 'Genuine patient experience.',
+        ]);
+        $legitGuestRes->assertStatus(201)
+            ->assertJsonPath('data.requires_otp', true);
+    }
+
+    public function test_concurrent_duplicate_submissions_allow_only_single_review(): void
+    {
+        $guestPhone = '+919840666777';
+
+        // 1. Manually simulate another process holding the atomic lock for this submission
+        $lockKey = "review_lock:biz_{$this->businessA->id}:phone_{$guestPhone}";
+        $activeLock = Cache::lock($lockKey, 10);
+        $this->assertTrue($activeLock->acquire());
+
+        // 2. Submission attempted while lock is held throws 409 conflict
+        // We set small timeout in test to confirm conflict response
+        $firstAttempt = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Concurrent Customer',
+            'phone_e164' => $guestPhone,
+            'rating' => 5,
+            'content' => 'First attempt under lock.',
+        ]);
+        $firstAttempt->assertStatus(409)
+            ->assertJsonPath('error.code', 'CONCURRENT_SUBMISSION');
+
+        // Release the simulated lock
+        $activeLock->release();
+
+        // 3. Once released, submission succeeds
+        $secondAttempt = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Concurrent Customer',
+            'phone_e164' => $guestPhone,
+            'rating' => 5,
+            'content' => 'Second attempt after lock release.',
+        ]);
+        $secondAttempt->assertStatus(201);
+
+        // 4. A subsequent submission with the same phone is rejected by 30-day duplicate rule
+        $thirdAttempt = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Concurrent Customer',
+            'phone_e164' => $guestPhone,
+            'rating' => 5,
+            'content' => 'Third attempt duplicate rejection.',
+        ]);
+        $thirdAttempt->assertStatus(422)
+            ->assertJsonPath('error.code', 'DUPLICATE_REVIEW_30_DAYS');
+
+        // Confirm only 1 review exists for this phone and business
+        $count = Review::query()
+            ->where('business_id', $this->businessA->id)
+            ->where('phone_e164', $guestPhone)
+            ->count();
+        $this->assertEquals(1, $count);
     }
 
     public function test_one_review_per_business_30_day_duplicate_protection(): void
@@ -387,6 +568,89 @@ final class CustomerReviewsAndModerationTest extends TestCase
 
         $review->refresh();
         $this->assertFalse($review->hasOwnerReply());
+    }
+
+    public function test_bayesian_zero_review_baseline_and_recalculation_after_moderation(): void
+    {
+        // 1. Newly created business defaults to bayesian_score = 3.500, review_count = 0, rating_avg = 0.00
+        $locality = Locality::query()->where('city_id', $this->city->id)->firstOrFail();
+        $newBiz = new Business([
+            'primary_category_id' => $this->category->id,
+            'city_id' => $this->city->id,
+            'locality_id' => $locality->id,
+            'name' => 'Green Fields Dental',
+            'slug' => 'green-fields-dental',
+            'address_line_1' => '23 Mount Road',
+            'pincode' => '600002',
+            'latitude' => 13.05,
+            'longitude' => 80.25,
+            'primary_phone_e164' => '+919840222111',
+        ]);
+        $newBiz->owner_user_id = $this->ownerA->id;
+        $newBiz->status = BusinessStatus::Active;
+        $newBiz->is_claimed = true;
+        $newBiz->is_verified = true;
+        $newBiz->save();
+
+        $this->assertEquals(0, $newBiz->review_count);
+        $this->assertEquals(0.00, (float) $newBiz->rating_avg);
+        $this->assertEquals(3.500, (float) $newBiz->bayesian_score);
+
+        // 2. Public review endpoint returns rating_avg = 0, review_count = 0 (Bayesian score is not shown as rating)
+        $publicRes = $this->getJson("/api/v1/businesses/{$this->city->slug}/{$newBiz->slug}/reviews");
+        $publicRes->assertStatus(200)
+            ->assertJsonPath('meta.rating_avg', 0)
+            ->assertJsonPath('meta.review_count', 0)
+            ->assertJsonCount(0, 'data');
+
+        // 3. Customer submits a 5-star review -> recalculated
+        $customer = User::factory()->create(['phone_e164' => '+919840999333']);
+        $token = $customer->createToken('cust-token')->plainTextToken;
+
+        $submitRes = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/v1/businesses/{$this->city->slug}/{$newBiz->slug}/reviews", [
+                'customer_name' => 'Meena',
+                'phone_e164' => '+919840999333',
+                'rating' => 5,
+                'content' => 'First review for new business.',
+            ]);
+        $submitRes->assertStatus(201);
+        $reviewUlid = $submitRes->json('data.review.public_id');
+
+        $newBiz->refresh();
+        $this->assertEquals(1, $newBiz->review_count);
+        $this->assertEquals(5.00, (float) $newBiz->rating_avg);
+        $this->assertEquals(3.636, (float) $newBiz->bayesian_score);
+
+        $this->app['auth']->forgetGuards();
+        $this->flushHeaders();
+
+        // 4. Super Admin rejects review -> recalculated back to 0 reviews and 3.500 baseline
+        $adminToken = $this->superAdmin->createToken('admin-token')->plainTextToken;
+        $modRes = $this->withHeader('Authorization', "Bearer {$adminToken}")
+            ->patchJson("/api/v1/admin/reviews/{$reviewUlid}/moderation", [
+                'status' => 'rejected',
+                'reason' => 'Test rejection',
+            ]);
+        $modRes->assertStatus(200);
+
+        $newBiz->refresh();
+        $this->assertEquals(0, $newBiz->review_count);
+        $this->assertEquals(0.00, (float) $newBiz->rating_avg);
+        $this->assertEquals(3.500, (float) $newBiz->bayesian_score);
+
+        // 5. Re-approve review -> recalculated back to 1 review and 3.636
+        $modRes2 = $this->withHeader('Authorization', "Bearer {$adminToken}")
+            ->patchJson("/api/v1/admin/reviews/{$reviewUlid}/moderation", [
+                'status' => 'approved',
+                'reason' => 'Restored after appeal',
+            ]);
+        $modRes2->assertStatus(200);
+
+        $newBiz->refresh();
+        $this->assertEquals(1, $newBiz->review_count);
+        $this->assertEquals(5.00, (float) $newBiz->rating_avg);
+        $this->assertEquals(3.636, (float) $newBiz->bayesian_score);
     }
 
     public function test_super_admin_can_moderate_reviews_and_audit_log_is_recorded(): void

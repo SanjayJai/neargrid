@@ -8,6 +8,7 @@ use App\Domains\Directory\Models\Business;
 use App\Domains\Identity\Models\OtpChallenge;
 use App\Domains\Reviews\Enums\ReviewModerationStatus;
 use App\Domains\Reviews\Enums\ReviewStatus;
+use App\Domains\Reviews\Enums\ReviewTrustBadge;
 use App\Models\User;
 use App\Support\Concerns\HasPublicUlid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'title',
     'content',
     'is_verified_interaction',
+    'trust_badge',
     'interaction_type',
     'interaction_id',
     'status',
@@ -58,6 +60,7 @@ class Review extends Model
         return [
             'rating' => 'integer',
             'is_verified_interaction' => 'boolean',
+            'trust_badge' => ReviewTrustBadge::class,
             'status' => ReviewStatus::class,
             'moderation_status' => ReviewModerationStatus::class,
             'phone_verified_at' => 'datetime',
@@ -133,5 +136,15 @@ class Review extends Model
     public function hasOwnerReply(): bool
     {
         return $this->owner_reply_text !== null && trim($this->owner_reply_text) !== '';
+    }
+
+    public function isVerifiedCustomer(): bool
+    {
+        return $this->trust_badge === ReviewTrustBadge::VerifiedCustomer;
+    }
+
+    public function isVerifiedLead(): bool
+    {
+        return $this->trust_badge === ReviewTrustBadge::VerifiedLead;
     }
 }

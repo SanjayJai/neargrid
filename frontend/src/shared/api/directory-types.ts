@@ -617,6 +617,8 @@ export interface UpdateOwnerLeadInput {
   is_read?: boolean;
 }
 
+export type ReviewTrustBadgeDto = 'verified_customer' | 'verified_lead' | 'none';
+
 export interface PublicReviewDto {
   public_id: string;
   customer_name: string;
@@ -624,6 +626,7 @@ export interface PublicReviewDto {
   title: string | null;
   content: string | null;
   is_verified_interaction: boolean;
+  trust_badge?: ReviewTrustBadgeDto;
   owner_reply: {
     text: string;
     replied_at: string | null;
@@ -646,6 +649,7 @@ export interface OwnerReviewDto {
   title: string | null;
   content: string | null;
   is_verified_interaction: boolean;
+  trust_badge?: ReviewTrustBadgeDto;
   interaction_type: string | null;
   status: string;
   moderation_status: string;
