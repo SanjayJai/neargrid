@@ -1,14 +1,17 @@
-import { callLaravelApi } from '@/lib/bff/laravel-client';
 import {
   bffError,
   enforceMutationSecurity,
-  forwardLaravelJson,
   isValidPublicUlid,
-  parseJsonBody,
   requireActiveBffSession,
 } from '@/lib/bff/route-helpers';
-import type { BusinessClaimDto } from '@/shared/api/directory-types';
 
+/**
+ * Step 4 Security Review Notice:
+ * Laravel `proof_file_path_private` represents a private storage disk path.
+ * A secure, isolated document upload pipeline for non-owner claimants is not yet available.
+ * To prevent submission of arbitrary unverified paths or cross-tenant storage references,
+ * self-serve claim submission is kept disabled until the required upload capability exists.
+ */
 export async function POST(
   request: Request,
   context: { params: { businessId: string } }
@@ -24,22 +27,9 @@ export async function POST(
     return bffError('INVALID_BUSINESS_ID', 'Invalid business identifier.', 400);
   }
 
-  const parsed = await parseJsonBody(request);
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    const result = await callLaravelApi<BusinessClaimDto>(
-      `/api/v1/businesses/${encodeURIComponent(businessId)}/claims`,
-      {
-        method: 'POST',
-        body: parsed.data,
-        bearerToken: session.record.accessToken,
-        requestId: request.headers.get('x-request-id'),
-      }
-    );
-
-    return forwardLaravelJson(result, session.opaqueSessionId);
-  } catch {
-    return bffError('UPSTREAM_UNREACHABLE', 'Unable to submit business claim.', 503);
-  }
+  return bffError(
+    'CLAIM_UPLOAD_UNAVAILABLE',
+    'Self-serve claim submission is disabled pending secure claimant document upload pipeline integration. Please contact support@neargrid.in for manual verification.',
+    501
+  );
 }
