@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Development;
 
+use App\Domains\Directory\Models\Business;
 use App\Domains\Identity\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -61,7 +62,7 @@ class DevSampleSeeder extends Seeder
             }
 
             if ($sample['role'] === 'business_owner') {
-                $biz = \App\Domains\Directory\Models\Business::first();
+                $biz = Business::first();
                 if ($biz !== null) {
                     $biz->owner_user_id = $user->id;
                     $biz->is_claimed = true;

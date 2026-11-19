@@ -48,4 +48,10 @@ return [
         'max_indexed_pagination_page' => 50,
     ],
 
+    'revalidation' => [
+        'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
+        'secret' => env('REVALIDATION_WEBHOOK_SECRET', env('APP_KEY')),
+        'queue' => env('REVALIDATION_QUEUE', 'notifications'),
+    ],
+
 ];

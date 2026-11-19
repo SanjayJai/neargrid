@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Directory;
 
 use App\Domains\Directory\Models\Business;
+use App\Domains\Identity\Exceptions\IdentityException;
 use App\Domains\Reviews\Enums\ReviewModerationStatus;
 use App\Domains\Reviews\Enums\ReviewStatus;
 use App\Domains\Reviews\Exceptions\ReviewException;
@@ -147,7 +148,7 @@ final class PublicReviewController extends Controller
             );
         } catch (ReviewException $e) {
             return ApiResponse::error($e->errorCode, $e->getMessage(), $e->httpStatus, $e->details);
-        } catch (\App\Domains\Identity\Exceptions\IdentityException $ie) {
+        } catch (IdentityException $ie) {
             return ApiResponse::error($ie->errorCode, $ie->getMessage(), $ie->httpStatus, $ie->details);
         }
 

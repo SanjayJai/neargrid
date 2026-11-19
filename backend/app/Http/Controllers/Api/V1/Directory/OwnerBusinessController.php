@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Directory;
 
 use App\Domains\Directory\Enums\BusinessMemberRole;
 use App\Domains\Directory\Enums\VerificationDocumentType;
+use App\Domains\Directory\Jobs\DispatchRevalidationWebhookJob;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Directory\Models\BusinessService;
@@ -83,6 +84,13 @@ final class OwnerBusinessController extends Controller
 
         $updated = $this->management->updateBusiness($user, $business, $request->validated());
 
+        $citySlug = $updated->city?->slug ?? 'chennai';
+        if ($updated->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$updated->slug}",
+            ], 'business_profile_updated')->afterCommit();
+        }
+
         return ApiResponse::success((new OwnerBusinessResource($updated))->resolve($request));
     }
 
@@ -95,6 +103,13 @@ final class OwnerBusinessController extends Controller
         /** @var list<array<string, mixed>> $slots */
         $slots = $request->validated()['hours'];
         $updated = $this->management->replaceOpeningHours($user, $business, $slots);
+
+        $citySlug = $updated->city?->slug ?? 'chennai';
+        if ($updated->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$updated->slug}",
+            ], 'business_hours_updated')->afterCommit();
+        }
 
         return ApiResponse::success([
             'business_public_id' => $updated->public_id,

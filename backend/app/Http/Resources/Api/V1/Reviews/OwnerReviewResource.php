@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1\Reviews;
 
+use App\Domains\Reviews\Enums\ReviewTrustBadge;
 use App\Domains\Reviews\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -25,7 +26,7 @@ final class OwnerReviewResource extends JsonResource
             'title' => $this->title,
             'content' => $this->content,
             'is_verified_interaction' => (bool) $this->is_verified_interaction,
-            'trust_badge' => $this->trust_badge instanceof \App\Domains\Reviews\Enums\ReviewTrustBadge
+            'trust_badge' => $this->trust_badge instanceof ReviewTrustBadge
                 ? $this->trust_badge->value
                 : ($this->trust_badge ?? 'none'),
             'interaction_type' => $this->interaction_type,

@@ -15,7 +15,6 @@ use App\Http\Resources\Api\V1\Leads\EnquiryResource;
 use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 
 final class PublicEnquiryController extends Controller
 {

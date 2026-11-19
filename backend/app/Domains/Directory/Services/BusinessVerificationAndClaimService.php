@@ -8,6 +8,7 @@ use App\Domains\Directory\Enums\BusinessMemberRole;
 use App\Domains\Directory\Enums\BusinessStatus;
 use App\Domains\Directory\Enums\VerificationDocumentType;
 use App\Domains\Directory\Exceptions\DirectoryException;
+use App\Domains\Directory\Jobs\DispatchRevalidationWebhookJob;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\BusinessClaim;
 use App\Domains\Directory\Models\BusinessMember;
@@ -77,6 +78,7 @@ final class BusinessVerificationAndClaimService
         BusinessVerification $verification,
         string $decision,
         ?string $rejectionReason = null,
+        bool $grantTrustBadge = false,
     ): BusinessVerification {
         if (! $admin->hasPermission('kyc.review')) {
             throw new DirectoryException('FORBIDDEN', 'Only authorized KYC reviewers can audit verifications.', Response::HTTP_FORBIDDEN);
@@ -86,7 +88,7 @@ final class BusinessVerificationAndClaimService
             throw new DirectoryException('INVALID_DECISION', 'Verification decision must be approved or rejected.');
         }
 
-        return DB::transaction(function () use ($admin, $verification, $decision, $rejectionReason): BusinessVerification {
+        return DB::transaction(function () use ($admin, $verification, $decision, $rejectionReason, $grantTrustBadge): BusinessVerification {
             $business = $verification->business;
             $oldState = [
                 'verification_status' => $verification->status,
@@ -103,6 +105,9 @@ final class BusinessVerificationAndClaimService
             if ($decision === 'approved') {
                 $business->is_verified = true;
                 $business->verified_at = now();
+                if ($grantTrustBadge) {
+                    $business->is_trusted = true;
+                }
                 if ($business->status === BusinessStatus::PendingReview) {
                     $business->status = BusinessStatus::Active;
                 }
@@ -122,6 +127,13 @@ final class BusinessVerificationAndClaimService
                 ],
                 actorRole: 'kyc_verifier',
             );
+
+            $citySlug = $business->city?->slug ?? 'chennai';
+            if ($business->slug) {
+                DispatchRevalidationWebhookJob::dispatch([
+                    "/{$citySlug}/business/{$business->slug}",
+                ], 'kyc_verification')->afterCommit();
+            }
 
             return $verification->refresh();
         });

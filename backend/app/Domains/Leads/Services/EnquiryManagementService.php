@@ -8,7 +8,6 @@ use App\Domains\Directory\Exceptions\DirectoryException;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Governance\Services\AuditLogger;
 use App\Domains\Identity\Enums\OtpPurpose;
-use App\Domains\Identity\Exceptions\IdentityException;
 use App\Domains\Identity\Services\AuthTokenService;
 use App\Domains\Identity\Services\OtpChallengeService;
 use App\Domains\Identity\Support\PhoneNormalizer;

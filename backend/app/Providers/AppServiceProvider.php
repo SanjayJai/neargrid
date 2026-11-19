@@ -7,6 +7,8 @@ namespace App\Providers;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Directory\Models\BusinessService;
+use App\Domains\Directory\Models\BusinessVerification;
+use App\Domains\Governance\Models\AuditLog;
 use App\Domains\Identity\Contracts\OtpSender;
 use App\Domains\Identity\Models\PersonalAccessToken;
 use App\Domains\Identity\Models\UserDevice;
@@ -17,10 +19,12 @@ use App\Domains\Media\Models\KycDocument;
 use App\Domains\Search\Contracts\SearchEngineInterface;
 use App\Domains\Search\Engines\MysqlSearchEngine;
 use App\Models\User;
+use App\Policies\AuditLogPolicy;
 use App\Policies\BusinessMediaPolicy;
 use App\Policies\BusinessMemberPolicy;
 use App\Policies\BusinessPolicy;
 use App\Policies\BusinessServicePolicy;
+use App\Policies\BusinessVerificationPolicy;
 use App\Policies\EnquiryPolicy;
 use App\Policies\KycDocumentPolicy;
 use App\Policies\PersonalAccessTokenPolicy;
@@ -68,8 +72,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(BusinessService::class, BusinessServicePolicy::class);
         Gate::policy(BusinessMember::class, BusinessMemberPolicy::class);
         Gate::policy(BusinessMedia::class, BusinessMediaPolicy::class);
+        Gate::policy(BusinessVerification::class, BusinessVerificationPolicy::class);
         Gate::policy(KycDocument::class, KycDocumentPolicy::class);
         Gate::policy(Enquiry::class, EnquiryPolicy::class);
+        Gate::policy(AuditLog::class, AuditLogPolicy::class);
 
         RateLimiter::for('search', static function (Request $request): Limit {
             $perMinute = max(10, (int) config('search.rate_limit_per_minute', 120));

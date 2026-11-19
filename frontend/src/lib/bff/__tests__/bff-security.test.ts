@@ -34,7 +34,8 @@ describe('BFF Session Store & Encryption Security', () => {
 
     // Tamper with auth tag -> must return null
     const parts = encrypted.split('.');
-    parts[1] = `${parts[1].slice(0, -2)}AA`;
+    const originalTag = parts[1];
+    parts[1] = originalTag.endsWith('AA') ? `${originalTag.slice(0, -2)}BB` : `${originalTag.slice(0, -2)}AA`;
     expect(decryptSessionRecord(parts.join('.'), secret)).toBeNull();
   });
 

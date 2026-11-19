@@ -27,4 +27,14 @@ final class UserPolicy
     {
         return $actor->hasRole('super_admin');
     }
+
+    public function viewAdmin(User $actor): bool
+    {
+        return $actor->hasRole('super_admin') || $actor->hasRole('support');
+    }
+
+    public function manageAdmin(User $actor): bool
+    {
+        return $actor->hasRole('super_admin');
+    }
 }

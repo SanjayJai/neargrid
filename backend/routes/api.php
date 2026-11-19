@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
 use App\Http\Controllers\Api\V1\Admin\AdminReviewController;
+use App\Http\Controllers\Api\V1\Admin\AdminUserController;
+use App\Http\Controllers\Api\V1\Admin\AdminVerificationController;
 use App\Http\Controllers\Api\V1\Auth\AccountController;
 use App\Http\Controllers\Api\V1\Auth\DeviceSessionController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
@@ -130,6 +133,17 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::get('/reviews', [AdminReviewController::class, 'index'])->name('reviews.index');
             Route::get('/reviews/{review}', [AdminReviewController::class, 'show'])->name('reviews.show');
             Route::patch('/reviews/{review}/moderation', [AdminReviewController::class, 'moderate'])->name('reviews.moderate');
+
+            Route::get('/verifications', [AdminVerificationController::class, 'index'])->name('verifications.index');
+            Route::get('/businesses/{business}/kyc-documents/{kycDocument}/signed-url', [AdminVerificationController::class, 'signedUrl'])->name('verifications.kyc-signed-url');
+            Route::post('/verifications/{verification}/review', [AdminVerificationController::class, 'review'])->name('verifications.review');
+
+            Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+            Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
+            Route::patch('/users/{user}/status', [AdminUserController::class, 'updateStatus'])->name('users.status');
+            Route::post('/users/{user}/revoke-sessions', [AdminUserController::class, 'revokeSessions'])->name('users.revoke-sessions');
+
+            Route::get('/audit-logs', [AdminAuditLogController::class, 'index'])->name('audit-logs.index');
         });
 
         // Short-lived, actor-bound, signature-verified private KYC download endpoint

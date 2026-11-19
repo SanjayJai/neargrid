@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Domains\Reviews\Services;
 
 use App\Domains\Directory\Enums\BusinessStatus;
+use App\Domains\Directory\Jobs\DispatchRevalidationWebhookJob;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Governance\Services\AuditLogger;
 use App\Domains\Identity\Enums\OtpPurpose;
+use App\Domains\Identity\Models\OtpChallenge;
 use App\Domains\Identity\Services\OtpChallengeService;
 use App\Domains\Identity\Support\PhoneNormalizer;
 use App\Domains\Leads\Enums\EnquiryStatus;
@@ -228,6 +230,11 @@ final class ReviewManagementService
 
             $this->recalculateBusinessRating($business);
 
+            $citySlug = $business->city?->slug ?? 'chennai';
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$business->slug}",
+            ], 'review_published')->afterCommit();
+
             return [
                 'review' => $review,
                 'requires_otp' => false,
@@ -240,7 +247,7 @@ final class ReviewManagementService
         $guestResult = DB::transaction(function () use ($business, $data, $phoneE164, $rating, $title, $content, $trustResolution, $ipHash, $ipAddress): array {
             $challenge = $this->otpService->requestChallenge($phoneE164, OtpPurpose::ReviewVerify, $ipAddress);
 
-            $otpRecord = \App\Domains\Identity\Models\OtpChallenge::query()
+            $otpRecord = OtpChallenge::query()
                 ->where('challenge_id', $challenge['challenge_id'])
                 ->first();
 
@@ -288,7 +295,7 @@ final class ReviewManagementService
             );
         }
 
-        $challenge = $review->otpChallenge ?? \App\Domains\Identity\Models\OtpChallenge::find($review->otp_challenge_id);
+        $challenge = $review->otpChallenge ?? OtpChallenge::find($review->otp_challenge_id);
         if ($challenge === null) {
             throw new ReviewException(
                 'INVALID_CHALLENGE',
@@ -311,6 +318,14 @@ final class ReviewManagementService
         $review->save();
 
         $this->recalculateBusinessRating($review->business);
+
+        $business = $review->business;
+        $citySlug = $business?->city?->slug ?? 'chennai';
+        if ($business?->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$business->slug}",
+            ], 'guest_review_verified')->afterCommit();
+        }
 
         return $review;
     }
@@ -355,6 +370,11 @@ final class ReviewManagementService
         $review->owner_reply_user_id = $actor->id;
         $review->save();
 
+        $citySlug = $business->city?->slug ?? 'chennai';
+        DispatchRevalidationWebhookJob::dispatch([
+            "/{$citySlug}/business/{$business->slug}",
+        ], 'owner_reply')->afterCommit();
+
         return $review;
     }
 
@@ -372,6 +392,11 @@ final class ReviewManagementService
         $review->owner_replied_at = null;
         $review->owner_reply_user_id = null;
         $review->save();
+
+        $citySlug = $business->city?->slug ?? 'chennai';
+        DispatchRevalidationWebhookJob::dispatch([
+            "/{$citySlug}/business/{$business->slug}",
+        ], 'owner_reply_deleted')->afterCommit();
 
         return $review;
     }
@@ -453,6 +478,14 @@ final class ReviewManagementService
                 'notes' => $reason,
             ]
         );
+
+        $business = $review->business;
+        $citySlug = $business?->city?->slug ?? 'chennai';
+        if ($business?->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$business->slug}",
+            ], 'review_moderation')->afterCommit();
+        }
 
         return $review;
     }
