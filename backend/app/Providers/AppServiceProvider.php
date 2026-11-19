@@ -11,6 +11,7 @@ use App\Domains\Identity\Contracts\OtpSender;
 use App\Domains\Identity\Models\PersonalAccessToken;
 use App\Domains\Identity\Models\UserDevice;
 use App\Domains\Identity\Services\NullOtpSender;
+use App\Domains\Leads\Models\Enquiry;
 use App\Domains\Media\Models\BusinessMedia;
 use App\Domains\Media\Models\KycDocument;
 use App\Domains\Search\Contracts\SearchEngineInterface;
@@ -20,6 +21,7 @@ use App\Policies\BusinessMediaPolicy;
 use App\Policies\BusinessMemberPolicy;
 use App\Policies\BusinessPolicy;
 use App\Policies\BusinessServicePolicy;
+use App\Policies\EnquiryPolicy;
 use App\Policies\KycDocumentPolicy;
 use App\Policies\PersonalAccessTokenPolicy;
 use App\Policies\UserDevicePolicy;
@@ -51,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(BusinessMember::class, BusinessMemberPolicy::class);
         Gate::policy(BusinessMedia::class, BusinessMediaPolicy::class);
         Gate::policy(KycDocument::class, KycDocumentPolicy::class);
+        Gate::policy(Enquiry::class, EnquiryPolicy::class);
 
         RateLimiter::for('search', static function (Request $request): Limit {
             $perMinute = max(10, (int) config('search.rate_limit_per_minute', 120));

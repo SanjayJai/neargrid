@@ -297,9 +297,78 @@ final class EnquirySubmissionAndOtpTest extends TestCase
         $customer = User::factory()->create();
         $token = $customer->createToken('customer-token')->plainTextToken;
 
-        $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/admin/enquiries');
+        // Seed an enquiry
+        $enquiry = Enquiry::query()->create([
+            'category_id' => $this->category->id,
+            'city_id' => $this->city->id,
+            'customer_name' => 'Secret Customer',
+            'phone_e164' => '+919840123456',
+            'requirement' => 'Private dental requirement.',
+            'status' => 'active',
+            'consent_given' => true,
+            'consent_version' => '2026.1',
+            'consent_text' => 'Direct consent',
+            'consent_timestamp' => now(),
+            'ip_address_hash' => hash('sha256', '127.0.0.1'),
+        ]);
 
-        $response->assertStatus(403);
+        // 1. Index forbidden
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/admin/enquiries')
+            ->assertStatus(403);
+
+        // 2. Show forbidden
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson("/api/v1/admin/enquiries/{$enquiry->public_id}")
+            ->assertStatus(403);
+
+        // 3. Cancel forbidden
+        $this->withHeader('Authorization', "Bearer {$token}")
+            ->patchJson("/api/v1/admin/enquiries/{$enquiry->public_id}/cancel", ['reason' => 'Hacker attempt'])
+            ->assertStatus(403);
+    }
+
+    public function test_customer_cannot_see_other_customers_enquiries(): void
+    {
+        $customerA = User::factory()->create();
+        $customerB = User::factory()->create();
+
+        $tokenA = $customerA->createToken('token-a')->plainTextToken;
+        $tokenB = $customerB->createToken('token-b')->plainTextToken;
+
+        // Customer A's enquiry
+        $enquiryA = Enquiry::query()->create([
+            'user_id' => $customerA->id,
+            'category_id' => $this->category->id,
+            'city_id' => $this->city->id,
+            'customer_name' => 'Customer Alice',
+            'phone_e164' => '+919840001111',
+            'requirement' => 'Alice secret dental requirement.',
+            'status' => 'active',
+            'consent_given' => true,
+            'consent_version' => '2026.1',
+            'consent_text' => 'Direct consent',
+            'consent_timestamp' => now(),
+            'ip_address_hash' => hash('sha256', '127.0.0.1'),
+        ]);
+
+        // Customer B fetches /account/enquiries
+        $responseB = $this->withHeader('Authorization', "Bearer {$tokenB}")
+            ->getJson('/api/v1/account/enquiries');
+
+        $responseB->assertStatus(200);
+        $this->assertEmpty($responseB->json('data'));
+        $this->assertStringNotContainsString('Alice secret dental requirement', $responseB->getContent());
+
+        // Reset auth guard cache between simulated requests in test container
+        $this->app['auth']->forgetGuards();
+
+        // Customer A fetches /account/enquiries
+        $responseA = $this->withHeader('Authorization', "Bearer {$tokenA}")
+            ->getJson('/api/v1/account/enquiries');
+
+        $responseA->assertStatus(200);
+        $this->assertCount(1, $responseA->json('data'));
+        $this->assertEquals($enquiryA->public_id, $responseA->json('data.0.public_id'));
     }
 }
