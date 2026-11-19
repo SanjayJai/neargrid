@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
 use App\Http\Controllers\Api\V1\Auth\AccountController;
 use App\Http\Controllers\Api\V1\Auth\DeviceSessionController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\Directory\OwnerBusinessController;
 use App\Http\Controllers\Api\V1\Directory\PublicBusinessController;
 use App\Http\Controllers\Api\V1\Directory\ReferenceTaxonomyController;
+use App\Http\Controllers\Api\V1\Leads\PublicEnquiryController;
 use App\Http\Controllers\Api\V1\Media\BusinessMediaController;
 use App\Http\Controllers\Api\V1\Media\KycDocumentController;
 use App\Http\Controllers\Api\V1\Search\SearchController;
@@ -26,6 +28,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
     // Public business profiles (only status=active, privacy-safe resource)
     Route::get('/businesses/{citySlug}/{businessSlug}', [PublicBusinessController::class, 'show'])->name('businesses.show');
+
+    // Privacy-compliant customer enquiries and contact reveals
+    Route::post('/enquiries', [PublicEnquiryController::class, 'store'])->name('enquiries.store');
+    Route::post('/enquiries/{enquiry}/verify-otp', [PublicEnquiryController::class, 'verifyOtp'])->name('enquiries.verify-otp');
+    Route::post('/businesses/{business}/contact-reveal', [PublicEnquiryController::class, 'contactReveal'])->name('businesses.contact-reveal');
 
     // Public search, nearby discovery, autocomplete & filters (rate-limited, active-only)
     Route::prefix('search')->name('search.')->group(function (): void {
@@ -90,6 +97,16 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::post('/{business}/kyc-documents', [KycDocumentController::class, 'store'])->name('kyc-documents.store');
             Route::post('/{business}/kyc-documents/{kycDocument}/signed-url', [KycDocumentController::class, 'signedUrl'])->name('kyc-documents.signed-url');
             Route::delete('/{business}/kyc-documents/{kycDocument}', [KycDocumentController::class, 'destroy'])->name('kyc-documents.destroy');
+        });
+
+        // Customer enquiry transparency portal
+        Route::get('/account/enquiries', [PublicEnquiryController::class, 'customerEnquiries'])->name('account.enquiries');
+
+        // Super Admin foundation endpoints (governance, moderation & audit)
+        Route::prefix('admin')->name('admin.')->group(function (): void {
+            Route::get('/enquiries', [AdminEnquiryController::class, 'index'])->name('enquiries.index');
+            Route::get('/enquiries/{enquiry}', [AdminEnquiryController::class, 'show'])->name('enquiries.show');
+            Route::patch('/enquiries/{enquiry}/cancel', [AdminEnquiryController::class, 'cancel'])->name('enquiries.cancel');
         });
 
         // Short-lived, actor-bound, signature-verified private KYC download endpoint

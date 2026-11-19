@@ -368,16 +368,16 @@ describe('Phase 3B Milestone 8 Step 3: Search Results & Canonical Directory Rout
   });
 
   describe('Privacy, honesty, and zero-demo-data safeguards', () => {
-    it('ensures EnquiryModal does not collect PII or claim to submit enquiries while Phase 3C is pending', () => {
+    it('ensures EnquiryModal implements privacy-first affirmative consent and OTP verification in Phase 3C', () => {
       const source = fs.readFileSync(
         path.join(FRONTEND_SRC, 'modules/customer/components/EnquiryModal.tsx'),
         'utf-8'
       );
-      expect(source).not.toContain('<form');
-      expect(source).not.toContain('Submit Enquiry');
-      expect(source).not.toContain('Enquiry Preview Recorded');
-      expect(source).toContain('Phase 3C');
-      expect(source).toContain('not active yet');
+      expect(source).toContain('consentGiven');
+      expect(source).toContain('/api/public/enquiries');
+      expect(source).toContain('/verify-otp');
+      expect(source).toContain('Digital Personal Data Protection');
+      expect(source).not.toContain('demo-directory');
     });
 
     it('ensures DirectoryListingCard keeps phone and WhatsApp privacy-safe without fake reveal or raw links', () => {

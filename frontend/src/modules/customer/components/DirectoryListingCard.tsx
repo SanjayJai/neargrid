@@ -191,12 +191,18 @@ export function DirectoryListingCard({ hit, priority = false }: DirectoryListing
         </div>
       </article>
 
-      {/* Honest Phase 3C Enquiry Feature Status Dialog */}
+      {/* Customer Enquiry Modal */}
       <EnquiryModal
         isOpen={enquiryOpen}
         onClose={() => setEnquiryOpen(false)}
         businessName={hit.name}
-        profileHref={profileHref}
+        businessSlug={hit.slug}
+        categorySlug={hit.primary_category?.slug ?? 'general'}
+        categoryName={hit.primary_category?.name ?? 'General'}
+        citySlug={citySlug}
+        cityName={hit.city_name ?? undefined}
+        localitySlug={hit.locality_slug ?? undefined}
+        localityName={hit.locality_name ?? undefined}
         phoneMasked={hit.phone_masked}
       />
     </>

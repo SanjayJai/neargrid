@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Navigation,
   Phone,
+  Send,
   ShieldCheck,
   Sparkles,
   Tag,
@@ -44,6 +45,7 @@ import {
 import { BusinessClaimModal } from './BusinessClaimModal';
 import { BusinessMediaGallery } from './BusinessMediaGallery';
 import { BusinessProfileActions } from './BusinessProfileActions';
+import { EnquiryModal } from './EnquiryModal';
 
 interface BusinessProfileViewProps {
   profile: PublicBusinessProfileDto;
@@ -80,6 +82,40 @@ export function BusinessProfileView({
   const [claimModalOpen, setClaimModalOpen] = useState(
     autoOpenClaim && !profile.is_claimed
   );
+  const [contactRevealed, setContactRevealed] = useState(false);
+  const [isRevealingContact, setIsRevealingContact] = useState(false);
+  const [enquiryModalOpen, setEnquiryModalOpen] = useState(false);
+
+  async function handleContactReveal() {
+    if (contactRevealed || isRevealingContact) return;
+    setIsRevealingContact(true);
+    try {
+      let csrfToken: string | null = null;
+      try {
+        const csrfRes = await fetch('/api/auth/csrf');
+        if (csrfRes.ok) {
+          const json = await csrfRes.json();
+          csrfToken = json?.data?.csrf_token ?? null;
+        }
+      } catch {
+        // ignore network error
+      }
+
+      await fetch(`/api/public/businesses/${profile.public_id}/contact-reveal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+        },
+        body: JSON.stringify({ channel: 'phone' }),
+      });
+      setContactRevealed(true);
+    } catch {
+      setContactRevealed(true);
+    } finally {
+      setIsRevealingContact(false);
+    }
+  }
 
   const deliverableMedia = getDeliverablePublicMedia(profile.media);
   const logoMedia = pickBusinessLogoMedia(profile.media);
@@ -233,6 +269,14 @@ export function BusinessProfileView({
               businessName={profile.name}
               canonicalUrl={canonicalUrl}
             />
+            <button
+              type="button"
+              onClick={() => setEnquiryModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+            >
+              <Send className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Enquire</span>
+            </button>
             {!profile.is_claimed && (
               <button
                 type="button"
@@ -636,20 +680,23 @@ export function BusinessProfileView({
             <h2 className="text-base font-bold text-ink">Contact &amp; Address</h2>
 
             <div className="mt-4 space-y-3">
-              {/* Privacy-Safe Masked Phone Badge */}
+              {/* Privacy-Safe Masked Phone Button */}
               {profile.contact.phone_masked && (
-                <div
-                  aria-label={`Masked phone number: ${profile.contact.phone_masked}`}
-                  className="flex items-center justify-between rounded-xl bg-trust-700 px-3.5 py-2.5 text-white"
+                <button
+                  type="button"
+                  onClick={handleContactReveal}
+                  disabled={isRevealingContact}
+                  aria-label={`Masked phone number: ${profile.contact.phone_masked}. Click to record contact intent.`}
+                  className="flex w-full items-center justify-between rounded-xl bg-trust-700 px-3.5 py-2.5 text-white transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-trust-500"
                 >
                   <span className="inline-flex items-center gap-2 text-sm font-semibold">
                     <Phone className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>{profile.contact.phone_masked}</span>
                   </span>
                   <span className="text-[10px] font-medium uppercase tracking-wider text-trust-100">
-                    Masked
+                    {contactRevealed ? 'Intent Logged' : 'Masked'}
                   </span>
-                </div>
+                </button>
               )}
 
               {/* WhatsApp Availability Badge (non-interactive; private number never exposed) */}
@@ -716,12 +763,26 @@ export function BusinessProfileView({
             </div>
           </div>
 
-          {/* Direct Enquiry Honest Phase 3C Notice (Zero fake form) */}
-          <PendingFeatureNotice
-            title="Direct Customer Enquiries"
-            description="Consented direct enquiry submission and merchant lead dispatch will launch in Phase 3C. No enquiry form data is collected on this page yet."
-            phaseLabel="Phase 3C Scheduled"
-          />
+          {/* Direct Customer Enquiry Card */}
+          <div className="rounded-2xl border border-brand-200 bg-white p-5 shadow-sm">
+            <div className="flex items-start gap-2.5">
+              <Send className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-bold text-ink">Send Direct Enquiry</h2>
+                <p className="mt-1 text-xs text-ink-muted leading-relaxed">
+                  Have questions or need pricing? Send your requirement directly to {profile.name}. Privacy protected with verified OTP.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setEnquiryModalOpen(true)}
+                  className="mt-3.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+                >
+                  <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Enquire Now</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
           {/* Claim This Business Card (only when unclaimed) */}
           {!profile.is_claimed ? (
@@ -773,6 +834,21 @@ export function BusinessProfileView({
           isAuthenticated={isAuthenticated}
         />
       )}
+
+      {/* Customer Direct Enquiry Modal */}
+      <EnquiryModal
+        isOpen={enquiryModalOpen}
+        onClose={() => setEnquiryModalOpen(false)}
+        businessName={profile.name}
+        businessSlug={profile.slug}
+        categorySlug={profile.primary_category?.slug ?? 'general'}
+        categoryName={profile.primary_category?.name ?? 'General'}
+        citySlug={citySlug}
+        cityName={profile.address.city?.name}
+        localitySlug={profile.address.locality?.slug}
+        localityName={profile.address.locality?.name}
+        phoneMasked={profile.contact.phone_masked ?? undefined}
+      />
     </div>
   );
 }

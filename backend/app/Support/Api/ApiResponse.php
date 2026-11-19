@@ -32,6 +32,14 @@ final class ApiResponse
         return self::success($data, $meta, Response::HTTP_CREATED, $headers);
     }
 
+    public static function accepted(
+        mixed $data = null,
+        array $meta = [],
+        array $headers = [],
+    ): JsonResponse {
+        return self::success($data, $meta, Response::HTTP_ACCEPTED, $headers);
+    }
+
     public static function noContent(array $headers = []): Response
     {
         return response()->noContent(Response::HTTP_NO_CONTENT, $headers);
