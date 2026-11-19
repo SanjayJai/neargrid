@@ -248,4 +248,130 @@ final class OwnerLeadManagementTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonPath('error.code', 'INVALID_STAFF_MEMBER');
     }
+
+    public function test_editor_without_leads_manage_cannot_update_lead_status_notes_or_read_state(): void
+    {
+        $lead = $this->createLead($this->businessA);
+        $editorToken = $this->editorA->createToken('editor-token')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', "Bearer {$editorToken}")
+            ->patchJson("/api/v1/owner/businesses/{$this->businessA->public_id}/leads/{$lead->public_id}", [
+                'lead_status' => 'contacted',
+                'merchant_notes' => 'Unauthorized editor note',
+                'is_read' => true,
+            ]);
+
+        $response->assertStatus(403);
+
+        $lead->refresh();
+        $this->assertEquals(LeadStatus::New, $lead->lead_status);
+        $this->assertNull($lead->merchant_notes);
+        $this->assertFalse($lead->is_read);
+        $this->assertNull($lead->read_at);
+    }
+
+    public function test_staff_from_another_business_cannot_access_or_mark_leads_read(): void
+    {
+        $leadA = $this->createLead($this->businessA);
+
+        $staffB = User::factory()->create(['name' => 'Agent Suresh']);
+        BusinessMember::query()->create([
+            'business_id' => $this->businessB->id,
+            'user_id' => $staffB->id,
+            'role' => BusinessMemberRole::LeadAgent,
+            'status' => 'active',
+            'permissions' => BusinessMemberRole::LeadAgent->defaultCapabilities(),
+        ]);
+        $staffBToken = $staffB->createToken('staff-b-token')->plainTextToken;
+
+        // Staff B attempts to list Business A's leads -> 403
+        $listRes = $this->withHeader('Authorization', "Bearer {$staffBToken}")
+            ->getJson("/api/v1/owner/businesses/{$this->businessA->public_id}/leads");
+        $listRes->assertStatus(403);
+
+        $this->app['auth']->forgetGuards();
+
+        // Staff B attempts to update Business A's lead via Business A endpoint -> 403
+        $updateViaARes = $this->withHeader('Authorization', "Bearer {$staffBToken}")
+            ->patchJson("/api/v1/owner/businesses/{$this->businessA->public_id}/leads/{$leadA->public_id}", [
+                'is_read' => true,
+            ]);
+        $updateViaARes->assertStatus(403);
+
+        $this->app['auth']->forgetGuards();
+
+        // Staff B attempts to update Business A's lead via Business B endpoint -> 404 (IDOR blocked)
+        $updateViaBRes = $this->withHeader('Authorization', "Bearer {$staffBToken}")
+            ->patchJson("/api/v1/owner/businesses/{$this->businessB->public_id}/leads/{$leadA->public_id}", [
+                'is_read' => true,
+            ]);
+        $updateViaBRes->assertStatus(404)
+            ->assertJsonPath('error.code', 'LEAD_NOT_FOUND');
+
+        // Confirm database state untouched
+        $leadA->refresh();
+        $this->assertFalse($leadA->is_read);
+        $this->assertNull($leadA->read_at);
+    }
+
+    public function test_customer_contact_details_and_merchant_notes_are_strictly_isolated(): void
+    {
+        $customer = User::factory()->create();
+        $customerToken = $customer->createToken('customer-token')->plainTextToken;
+
+        $leadA = $this->createLead($this->businessA, [
+            'user_id' => $customer->id,
+            'customer_name' => 'Kavitha Raman',
+            'phone_e164' => '+919840555666',
+            'email' => 'kavitha@example.in',
+            'requirement' => 'Dental implants consultation required.',
+        ]);
+
+        $ownerAToken = $this->ownerA->createToken('owner-a-token')->plainTextToken;
+        $ownerBToken = $this->ownerB->createToken('owner-b-token')->plainTextToken;
+
+        // Owner A updates internal merchant notes
+        $updateRes = $this->withHeader('Authorization', "Bearer {$ownerAToken}")
+            ->patchJson("/api/v1/owner/businesses/{$this->businessA->public_id}/leads/{$leadA->public_id}", [
+                'merchant_notes' => 'Confidential internal note: agreed 15% discount for full procedure.',
+            ]);
+        $updateRes->assertStatus(200);
+
+        $this->app['auth']->forgetGuards();
+
+        // 1. Business B lists their leads: zero leads returned, cannot see Business A's lead or contact info
+        $bizBListRes = $this->withHeader('Authorization', "Bearer {$ownerBToken}")
+            ->getJson("/api/v1/owner/businesses/{$this->businessB->public_id}/leads");
+        $bizBListRes->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+        $this->assertStringNotContainsString('+919840555666', $bizBListRes->getContent());
+        $this->assertStringNotContainsString('kavitha@example.in', $bizBListRes->getContent());
+        $this->assertStringNotContainsString('Confidential internal note', $bizBListRes->getContent());
+
+        $this->app['auth']->forgetGuards();
+
+        // 2. Business B attempts to fetch/update Lead A via Business B: 404
+        $bizBUpdateRes = $this->withHeader('Authorization', "Bearer {$ownerBToken}")
+            ->patchJson("/api/v1/owner/businesses/{$this->businessB->public_id}/leads/{$leadA->public_id}", [
+                'merchant_notes' => 'Malicious overwrite attempt',
+            ]);
+        $bizBUpdateRes->assertStatus(404);
+
+        $this->app['auth']->forgetGuards();
+
+        // 3. Customer fetches their own enquiry via /api/v1/account/enquiries: merchant_notes are NEVER exposed
+        $customerEnquiriesRes = $this->withHeader('Authorization', "Bearer {$customerToken}")
+            ->getJson('/api/v1/account/enquiries');
+        $customerEnquiriesRes->assertStatus(200);
+        $this->assertStringNotContainsString('Confidential internal note', $customerEnquiriesRes->getContent());
+        $this->assertStringNotContainsString('merchant_notes', $customerEnquiriesRes->getContent());
+
+        // 4. Public storefront profile: never exposes customer contact info or merchant notes
+        $publicProfileRes = $this->getJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}");
+        $publicProfileRes->assertStatus(200);
+        $this->assertStringNotContainsString('+919840555666', $publicProfileRes->getContent());
+        $this->assertStringNotContainsString('kavitha@example.in', $publicProfileRes->getContent());
+        $this->assertStringNotContainsString('Confidential internal note', $publicProfileRes->getContent());
+        $this->assertStringNotContainsString('merchant_notes', $publicProfileRes->getContent());
+    }
 }
