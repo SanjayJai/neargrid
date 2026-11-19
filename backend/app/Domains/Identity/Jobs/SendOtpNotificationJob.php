@@ -7,12 +7,13 @@ namespace App\Domains\Identity\Jobs;
 use App\Domains\Identity\Contracts\OtpSender;
 use App\Domains\Identity\Enums\OtpPurpose;
 use App\Domains\Identity\Support\PhoneNormalizer;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-final class SendOtpNotificationJob implements ShouldQueue
+final class SendOtpNotificationJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Queueable;
 
@@ -25,6 +26,7 @@ final class SendOtpNotificationJob implements ShouldQueue
         public readonly string $otpCode,
         public readonly OtpPurpose $purpose,
         public readonly int $ttlSeconds,
+        public readonly string $challengeId,
     ) {
         $this->onQueue((string) config('directory.otp.queue', 'notifications'));
     }
@@ -41,8 +43,8 @@ final class SendOtpNotificationJob implements ShouldQueue
 
     public function handle(OtpSender $otpSender): void
     {
-        // Deliver OTP via pluggable provider; never log or return plaintext code.
-        $otpSender->send($this->phoneE164, $this->otpCode, $this->purpose, $this->ttlSeconds);
+        // Deliver OTP via pluggable provider with challengeId as idempotency key; never log or return plaintext code.
+        $otpSender->send($this->phoneE164, $this->otpCode, $this->purpose, $this->ttlSeconds, $this->challengeId);
     }
 
     public function failed(?Throwable $exception): void
@@ -50,6 +52,7 @@ final class SendOtpNotificationJob implements ShouldQueue
         Log::error('Asynchronous OTP delivery job failed permanently after retries', [
             'phone' => PhoneNormalizer::mask($this->phoneE164),
             'purpose' => $this->purpose->value,
+            'challenge_id' => $this->challengeId,
             'exception' => $exception?->getMessage(),
         ]);
     }

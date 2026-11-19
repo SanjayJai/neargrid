@@ -6,15 +6,11 @@ namespace Tests\Feature\Api\V1\Leads;
 
 use App\Domains\Directory\Enums\BusinessStatus;
 use App\Domains\Directory\Models\Business;
-use App\Domains\Governance\Models\AuditLog;
 use App\Domains\Identity\Contracts\OtpSender;
 use App\Domains\Identity\Models\OtpChallenge;
 use App\Domains\Identity\Models\Role;
 use App\Domains\Leads\Enums\EnquiryStatus;
-use App\Domains\Leads\Enums\EnquiryType;
-use App\Domains\Leads\Models\ContactReveal;
 use App\Domains\Leads\Models\Enquiry;
-use App\Domains\Leads\Models\EnquiryRecipient;
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use App\Domains\Taxonomy\Models\Category;
@@ -44,7 +40,7 @@ final class EnquirySubmissionAndOtpTest extends TestCase
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
 
-        $this->fakeOtpSender = new FakeOtpSender();
+        $this->fakeOtpSender = new FakeOtpSender;
         $this->app->instance(OtpSender::class, $this->fakeOtpSender);
 
         $this->city = City::query()->where('slug', 'chennai')->firstOrFail();

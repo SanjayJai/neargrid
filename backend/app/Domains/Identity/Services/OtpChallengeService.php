@@ -62,7 +62,13 @@ final class OtpChallengeService
         $this->hitRequestRateLimits($phoneE164, $ipAddress);
 
         // Dispatch OTP SMS asynchronously through Laravel queue with afterCommit to prevent loss or pre-commit firing.
-        SendOtpNotificationJob::dispatch($phoneE164, $otpCode, $purpose, $ttlSeconds)->afterCommit();
+        SendOtpNotificationJob::dispatch(
+            phoneE164: $phoneE164,
+            otpCode: $otpCode,
+            purpose: $purpose,
+            ttlSeconds: $ttlSeconds,
+            challengeId: $challenge->challenge_id,
+        )->afterCommit();
 
         return [
             'challenge_id' => $challenge->challenge_id,

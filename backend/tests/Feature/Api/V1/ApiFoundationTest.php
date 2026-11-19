@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api\V1;
 
+use App\Providers\AppServiceProvider;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -213,9 +214,23 @@ final class ApiFoundationTest extends TestCase
             ->assertJsonPath('error.details.checks.cache', 'degraded');
 
         // 2. AppServiceProvider boot enforces redis cache store in production
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage("Production configuration violation: CACHE_STORE must be set to 'redis'");
 
-        (new \App\Providers\AppServiceProvider($this->app))->boot();
+        (new AppServiceProvider($this->app))->boot();
+    }
+
+    public function test_production_queue_connection_must_be_redis(): void
+    {
+        $this->app->detectEnvironment(static fn () => 'production');
+        config([
+            'cache.default' => 'redis',
+            'queue.default' => 'sync',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Production configuration violation: QUEUE_CONNECTION must be set to 'redis'");
+
+        (new AppServiceProvider($this->app))->boot();
     }
 }

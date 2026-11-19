@@ -50,6 +50,13 @@ class AppServiceProvider extends ServiceProvider
                     "Production configuration violation: CACHE_STORE must be set to 'redis' (currently '{$cacheStore}'). Database, file, or array stores are not permitted in production."
                 );
             }
+
+            $queueConnection = (string) config('queue.default');
+            if ($queueConnection !== 'redis') {
+                throw new \RuntimeException(
+                    "Production configuration violation: QUEUE_CONNECTION must be set to 'redis' (currently '{$queueConnection}'). Synchronous or database queue connections are not permitted in production."
+                );
+            }
         }
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);

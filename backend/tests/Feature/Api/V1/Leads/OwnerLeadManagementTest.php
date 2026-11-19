@@ -13,6 +13,7 @@ use App\Domains\Leads\Enums\LeadStatus;
 use App\Domains\Leads\Models\Enquiry;
 use App\Domains\Leads\Models\EnquiryRecipient;
 use App\Domains\Location\Models\City;
+use App\Domains\Location\Models\Locality;
 use App\Domains\Taxonomy\Models\Category;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -24,12 +25,19 @@ final class OwnerLeadManagementTest extends TestCase
     use RefreshDatabase;
 
     private Business $businessA;
+
     private Business $businessB;
+
     private User $ownerA;
+
     private User $ownerB;
+
     private User $leadAgentA;
+
     private User $editorA;
+
     private Category $category;
+
     private City $city;
 
     protected function setUp(): void
@@ -39,7 +47,7 @@ final class OwnerLeadManagementTest extends TestCase
 
         $this->city = City::query()->where('slug', 'chennai')->firstOrFail();
         $this->category = Category::query()->where('slug', 'dentists')->firstOrFail();
-        $locality = \App\Domains\Location\Models\Locality::query()->where('city_id', $this->city->id)->firstOrFail();
+        $locality = Locality::query()->where('city_id', $this->city->id)->firstOrFail();
 
         $this->ownerA = User::factory()->create();
         $this->businessA = new Business([

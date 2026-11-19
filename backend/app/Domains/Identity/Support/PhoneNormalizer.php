@@ -53,4 +53,13 @@ final class PhoneNormalizer
 
         return $cleaned;
     }
+
+    public static function mask(string $phoneE164): string
+    {
+        if (strlen($phoneE164) <= 7) {
+            return substr($phoneE164, 0, 3).'***';
+        }
+
+        return substr($phoneE164, 0, 3).'******'.substr($phoneE164, -4);
+    }
 }

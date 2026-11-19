@@ -10,7 +10,10 @@ use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Governance\Models\AuditLog;
 use App\Domains\Identity\Contracts\OtpSender;
+use App\Domains\Identity\Enums\OtpPurpose;
+use App\Domains\Identity\Jobs\SendOtpNotificationJob;
 use App\Domains\Identity\Models\Role;
+use App\Domains\Identity\Support\PhoneNormalizer;
 use App\Domains\Leads\Enums\EnquiryStatus;
 use App\Domains\Leads\Enums\LeadStatus;
 use App\Domains\Leads\Models\ContactReveal;
@@ -20,13 +23,17 @@ use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use App\Domains\Reviews\Enums\ReviewModerationStatus;
 use App\Domains\Reviews\Enums\ReviewStatus;
-use App\Domains\Reviews\Enums\ReviewTrustBadge;
 use App\Domains\Reviews\Models\Review;
 use App\Domains\Taxonomy\Models\Category;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Contracts\Encryption\Encrypter;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
+use ReflectionMethod;
 use Tests\Fakes\FakeOtpSender;
 use Tests\TestCase;
 
@@ -35,14 +42,23 @@ final class CustomerReviewsAndModerationTest extends TestCase
     use RefreshDatabase;
 
     private Business $businessA;
+
     private Business $businessB;
+
     private User $ownerA;
+
     private User $ownerB;
+
     private User $leadAgentA;
+
     private User $editorA;
+
     private User $superAdmin;
+
     private Category $category;
+
     private City $city;
+
     private FakeOtpSender $fakeOtpSender;
 
     protected function setUp(): void
@@ -50,7 +66,7 @@ final class CustomerReviewsAndModerationTest extends TestCase
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
 
-        $this->fakeOtpSender = new FakeOtpSender();
+        $this->fakeOtpSender = new FakeOtpSender;
         $this->app->instance(OtpSender::class, $this->fakeOtpSender);
 
         $this->city = City::query()->where('slug', 'chennai')->firstOrFail();
@@ -743,7 +759,7 @@ final class CustomerReviewsAndModerationTest extends TestCase
 
     public function test_guest_review_dispatches_otp_sms_asynchronously_without_synchronous_network_io_under_lock(): void
     {
-        \Illuminate\Support\Facades\Queue::fake([\App\Domains\Identity\Jobs\SendOtpNotificationJob::class]);
+        Queue::fake([SendOtpNotificationJob::class]);
 
         $guestPhone = '+919840999777';
 
@@ -757,13 +773,135 @@ final class CustomerReviewsAndModerationTest extends TestCase
         $res->assertStatus(201)
             ->assertJsonPath('data.requires_otp', true);
 
-        // Assert job was dispatched asynchronously to the notifications queue with proper retries
-        \Illuminate\Support\Facades\Queue::assertPushed(\App\Domains\Identity\Jobs\SendOtpNotificationJob::class, function ($job) use ($guestPhone) {
+        $expectedChallengeId = $res->json('data.challenge_id');
+        $this->assertNotNull($expectedChallengeId);
+
+        // Assert job was dispatched asynchronously to the notifications queue with proper retries and challenge identifier
+        Queue::assertPushed(SendOtpNotificationJob::class, function (SendOtpNotificationJob $job) use ($guestPhone, $expectedChallengeId) {
             return $job->phoneE164 === $guestPhone
-                && $job->purpose === \App\Domains\Identity\Enums\OtpPurpose::ReviewVerify
+                && $job->purpose === OtpPurpose::ReviewVerify
                 && $job->tries === 3
+                && $job->timeout === 30
                 && $job->backoff() === [2, 10, 30]
+                && $job->challengeId === $expectedChallengeId
                 && strlen($job->otpCode) === 6;
         });
+    }
+
+    public function test_otp_notification_job_is_encrypted_and_protects_plaintext_payload(): void
+    {
+        $job = new SendOtpNotificationJob(
+            phoneE164: '+919840999888',
+            otpCode: '654321',
+            purpose: OtpPurpose::ReviewVerify,
+            ttlSeconds: 300,
+            challengeId: 'chal_test_payload_enc_123',
+        );
+
+        // 1. Must implement ShouldBeEncrypted contract
+        $this->assertInstanceOf(ShouldBeEncrypted::class, $job);
+
+        // 2. Queue driver serialized payload must NOT leak plaintext OTP
+        $queue = $this->app->make('queue')->connection('sync');
+        $refMethod = new ReflectionMethod($queue, 'createPayload');
+        $refMethod->setAccessible(true);
+        $payloadString = $refMethod->invoke($queue, $job, 'notifications');
+
+        $this->assertIsString($payloadString);
+        $this->assertStringNotContainsString('654321', $payloadString, 'Plaintext OTP must never appear in raw queue payload.');
+
+        $payload = json_decode($payloadString, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertArrayHasKey('data', $payload);
+        $this->assertArrayHasKey('command', $payload['data']);
+
+        // 3. Encrypted command must decrypt cleanly to identical job instance
+        $encrypter = $this->app->make(Encrypter::class);
+        $decryptedCommand = unserialize($encrypter->decrypt($payload['data']['command']));
+
+        $this->assertInstanceOf(SendOtpNotificationJob::class, $decryptedCommand);
+        $this->assertSame('+919840999888', $decryptedCommand->phoneE164);
+        $this->assertSame('654321', $decryptedCommand->otpCode);
+        $this->assertSame('chal_test_payload_enc_123', $decryptedCommand->challengeId);
+        $this->assertSame(OtpPurpose::ReviewVerify, $decryptedCommand->purpose);
+
+        // 4. Failed job logging must NOT disclose plaintext OTP
+        Log::spy();
+        $job->failed(new \RuntimeException('Downstream SMS gateway network timeout'));
+        Log::shouldHaveReceived('error')->with(
+            'Asynchronous OTP delivery job failed permanently after retries',
+            \Mockery::on(function (array $context): bool {
+                return ! in_array('654321', $context, true)
+                    && ($context['challenge_id'] ?? null) === 'chal_test_payload_enc_123'
+                    && ($context['purpose'] ?? null) === OtpPurpose::ReviewVerify->value
+                    && ($context['phone'] ?? null) === PhoneNormalizer::mask('+919840999888');
+            })
+        );
+    }
+
+    public function test_otp_sms_idempotency_token_propagated_to_sender_on_retries(): void
+    {
+        $guestPhone = '+919840999111';
+
+        $res = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Idempotency Customer',
+            'phone_e164' => $guestPhone,
+            'rating' => 4,
+            'content' => 'Review verifying idempotency token propagation.',
+        ]);
+
+        $res->assertStatus(201);
+        $challengeId = $res->json('data.challenge_id');
+        $this->assertNotNull($challengeId);
+
+        // Verify FakeOtpSender received the challenge_id on initial dispatch
+        $this->assertNotEmpty($this->fakeOtpSender->sent);
+        $initialSend = end($this->fakeOtpSender->sent);
+        $this->assertSame($challengeId, $initialSend['challenge_id']);
+        $this->assertSame($guestPhone, $initialSend['phone_e164']);
+
+        // Simulate queue worker retry on transient connection fault
+        $job = new SendOtpNotificationJob(
+            phoneE164: $guestPhone,
+            otpCode: $initialSend['otp'],
+            purpose: OtpPurpose::ReviewVerify,
+            ttlSeconds: 300,
+            challengeId: $challengeId,
+        );
+
+        // Attempt 2 (Retry 1)
+        $job->handle($this->fakeOtpSender);
+        // Attempt 3 (Retry 2)
+        $job->handle($this->fakeOtpSender);
+
+        // Both retry attempts must pass the EXACT SAME stable challengeId to the sender
+        $sentRecords = array_values(array_filter(
+            $this->fakeOtpSender->sent,
+            static fn (array $entry) => $entry['phone_e164'] === $guestPhone
+        ));
+
+        $this->assertCount(3, $sentRecords);
+        foreach ($sentRecords as $record) {
+            $this->assertSame($challengeId, $record['challenge_id'], 'Every attempt must carry identical challengeId as idempotency key.');
+        }
+
+        // Verify duplicate review submission for the same business is blocked by 30-day duplicate protection
+        $duplicateSameBiz = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Idempotency Customer Duplicate',
+            'phone_e164' => $guestPhone,
+            'rating' => 5,
+            'content' => 'Duplicate review for same business.',
+        ]);
+        $duplicateSameBiz->assertStatus(422)
+            ->assertJsonPath('error.code', 'DUPLICATE_REVIEW_30_DAYS');
+
+        // Verify OTP resend cooldown blocks premature review challenge request for a different business
+        $duplicateOtherBiz = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessB->slug}/reviews", [
+            'customer_name' => 'Idempotency Customer Other Biz',
+            'phone_e164' => $guestPhone,
+            'rating' => 5,
+            'content' => 'Review for second business during OTP cooldown window.',
+        ]);
+        $duplicateOtherBiz->assertStatus(429)
+            ->assertJsonPath('error.code', 'OTP_RESEND_COOLDOWN');
     }
 }

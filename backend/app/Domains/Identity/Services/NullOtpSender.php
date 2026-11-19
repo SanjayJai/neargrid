@@ -6,22 +6,27 @@ namespace App\Domains\Identity\Services;
 
 use App\Domains\Identity\Contracts\OtpSender;
 use App\Domains\Identity\Enums\OtpPurpose;
+use App\Domains\Identity\Support\PhoneNormalizer;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Safe non-sending default driver for local/testing environments.
- * Never logs plaintext OTP codes; logs only masked recipient metadata.
+ * Never logs plaintext OTP codes; logs only masked recipient metadata and trace challengeId.
  */
 final class NullOtpSender implements OtpSender
 {
-    public function send(string $phoneE164, string $otpCode, OtpPurpose $purpose, int $ttlSeconds): void
-    {
-        $masked = substr($phoneE164, 0, 3).'******'.substr($phoneE164, -4);
-
+    public function send(
+        string $phoneE164,
+        string $otpCode,
+        OtpPurpose $purpose,
+        int $ttlSeconds,
+        ?string $challengeId = null,
+    ): void {
         Log::info('OTP challenge dispatched via NullOtpSender', [
-            'recipient_masked' => $masked,
+            'recipient_masked' => PhoneNormalizer::mask($phoneE164),
             'purpose' => $purpose->value,
             'ttl_seconds' => $ttlSeconds,
+            'challenge_id' => $challengeId,
         ]);
     }
 }
