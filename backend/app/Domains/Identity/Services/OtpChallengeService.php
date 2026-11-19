@@ -7,6 +7,7 @@ namespace App\Domains\Identity\Services;
 use App\Domains\Identity\Contracts\OtpSender;
 use App\Domains\Identity\Enums\OtpPurpose;
 use App\Domains\Identity\Exceptions\IdentityException;
+use App\Domains\Identity\Jobs\SendOtpNotificationJob;
 use App\Domains\Identity\Models\OtpChallenge;
 use App\Domains\Identity\Support\PhoneNormalizer;
 use Illuminate\Http\Response;
@@ -60,8 +61,8 @@ final class OtpChallengeService
 
         $this->hitRequestRateLimits($phoneE164, $ipAddress);
 
-        // Deliver OTP via pluggable provider; never log or return plaintext code.
-        $this->otpSender->send($phoneE164, $otpCode, $purpose, $ttlSeconds);
+        // Dispatch OTP SMS asynchronously through Laravel queue with afterCommit to prevent loss or pre-commit firing.
+        SendOtpNotificationJob::dispatch($phoneE164, $otpCode, $purpose, $ttlSeconds)->afterCommit();
 
         return [
             'challenge_id' => $challenge->challenge_id,

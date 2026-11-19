@@ -740,4 +740,30 @@ final class CustomerReviewsAndModerationTest extends TestCase
             ]);
         $modRes->assertStatus(403);
     }
+
+    public function test_guest_review_dispatches_otp_sms_asynchronously_without_synchronous_network_io_under_lock(): void
+    {
+        \Illuminate\Support\Facades\Queue::fake([\App\Domains\Identity\Jobs\SendOtpNotificationJob::class]);
+
+        $guestPhone = '+919840999777';
+
+        $res = $this->postJson("/api/v1/businesses/{$this->city->slug}/{$this->businessA->slug}/reviews", [
+            'customer_name' => 'Async OTP Customer',
+            'phone_e164' => $guestPhone,
+            'rating' => 5,
+            'content' => 'Review verifying async queue dispatch.',
+        ]);
+
+        $res->assertStatus(201)
+            ->assertJsonPath('data.requires_otp', true);
+
+        // Assert job was dispatched asynchronously to the notifications queue with proper retries
+        \Illuminate\Support\Facades\Queue::assertPushed(\App\Domains\Identity\Jobs\SendOtpNotificationJob::class, function ($job) use ($guestPhone) {
+            return $job->phoneE164 === $guestPhone
+                && $job->purpose === \App\Domains\Identity\Enums\OtpPurpose::ReviewVerify
+                && $job->tries === 3
+                && $job->backoff() === [2, 10, 30]
+                && strlen($job->otpCode) === 6;
+        });
+    }
 }

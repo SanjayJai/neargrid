@@ -66,6 +66,10 @@ final class SystemController extends Controller
 
     private function checkCache(): string
     {
+        if (app()->isProduction() && config('cache.default') !== 'redis') {
+            return 'degraded';
+        }
+
         $probeKey = 'health:probe:'.uniqid('', true);
 
         try {

@@ -43,6 +43,15 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->isProduction()) {
+            $cacheStore = (string) config('cache.default');
+            if ($cacheStore !== 'redis') {
+                throw new \RuntimeException(
+                    "Production configuration violation: CACHE_STORE must be set to 'redis' (currently '{$cacheStore}'). Database, file, or array stores are not permitted in production."
+                );
+            }
+        }
+
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         Gate::policy(User::class, UserPolicy::class);

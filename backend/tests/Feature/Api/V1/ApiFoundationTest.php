@@ -201,4 +201,21 @@ final class ApiFoundationTest extends TestCase
             );
         }
     }
+
+    public function test_production_cache_store_must_be_redis(): void
+    {
+        // 1. In production, health endpoint marks cache degraded if cache driver is not redis
+        $this->app->detectEnvironment(static fn () => 'production');
+        config(['cache.default' => 'database']);
+
+        $res = $this->getJson('/api/v1/health');
+        $res->assertStatus(503)
+            ->assertJsonPath('error.details.checks.cache', 'degraded');
+
+        // 2. AppServiceProvider boot enforces redis cache store in production
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Production configuration violation: CACHE_STORE must be set to 'redis'");
+
+        (new \App\Providers\AppServiceProvider($this->app))->boot();
+    }
 }

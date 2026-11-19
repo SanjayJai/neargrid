@@ -234,38 +234,47 @@ final class ReviewManagementService
             ];
         }
 
-        // Unauthenticated guest: issue OTP challenge before publishing
-        $challenge = $this->otpService->requestChallenge($phoneE164, OtpPurpose::ReviewVerify, $ipAddress);
+        // Unauthenticated guest: persist OTP challenge and review inside DB transaction.
+        // SMS notification is dispatched asynchronously via Laravel queue after transaction commit.
+        /** @var array{challenge: array{challenge_id: string, expires_in_seconds: int, resend_after_seconds: int}, review: Review} $guestResult */
+        $guestResult = DB::transaction(function () use ($business, $data, $phoneE164, $rating, $title, $content, $trustResolution, $ipHash, $ipAddress): array {
+            $challenge = $this->otpService->requestChallenge($phoneE164, OtpPurpose::ReviewVerify, $ipAddress);
 
-        $otpRecord = \App\Domains\Identity\Models\OtpChallenge::query()
-            ->where('challenge_id', $challenge['challenge_id'])
-            ->first();
+            $otpRecord = \App\Domains\Identity\Models\OtpChallenge::query()
+                ->where('challenge_id', $challenge['challenge_id'])
+                ->first();
 
-        $review = Review::query()->create([
-            'business_id' => $business->id,
-            'user_id' => null,
-            'customer_name' => trim($data['customer_name']),
-            'phone_e164' => $phoneE164,
-            'rating' => $rating,
-            'title' => $title,
-            'content' => $content,
-            'is_verified_interaction' => $trustResolution['is_verified'],
-            'trust_badge' => $trustResolution['trust_badge'],
-            'interaction_type' => $trustResolution['type'],
-            'interaction_id' => $trustResolution['id'],
-            'status' => ReviewStatus::PendingVerification,
-            'moderation_status' => ReviewModerationStatus::Pending,
-            'otp_challenge_id' => $otpRecord?->id,
-            'phone_verified_at' => null,
-            'ip_address_hash' => $ipHash,
-        ]);
+            $review = Review::query()->create([
+                'business_id' => $business->id,
+                'user_id' => null,
+                'customer_name' => trim($data['customer_name']),
+                'phone_e164' => $phoneE164,
+                'rating' => $rating,
+                'title' => $title,
+                'content' => $content,
+                'is_verified_interaction' => $trustResolution['is_verified'],
+                'trust_badge' => $trustResolution['trust_badge'],
+                'interaction_type' => $trustResolution['type'],
+                'interaction_id' => $trustResolution['id'],
+                'status' => ReviewStatus::PendingVerification,
+                'moderation_status' => ReviewModerationStatus::Pending,
+                'otp_challenge_id' => $otpRecord?->id,
+                'phone_verified_at' => null,
+                'ip_address_hash' => $ipHash,
+            ]);
+
+            return [
+                'challenge' => $challenge,
+                'review' => $review,
+            ];
+        });
 
         return [
-            'review' => $review,
+            'review' => $guestResult['review'],
             'requires_otp' => true,
-            'challenge_id' => $challenge['challenge_id'],
-            'expires_in_seconds' => $challenge['expires_in_seconds'],
-            'resend_after_seconds' => $challenge['resend_after_seconds'],
+            'challenge_id' => $guestResult['challenge']['challenge_id'],
+            'expires_in_seconds' => $guestResult['challenge']['expires_in_seconds'],
+            'resend_after_seconds' => $guestResult['challenge']['resend_after_seconds'],
         ];
     }
 
