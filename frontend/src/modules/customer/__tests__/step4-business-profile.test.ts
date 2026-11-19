@@ -551,6 +551,8 @@ describe('Phase 3B Milestone 8 Step 4: Live Business Profile', () => {
       expect(claimSource).toContain('/login?next=');
       expect(claimSource).toContain('proof_file_path_private');
       expect(claimSource).toContain('does not immediately grant ownership');
+      expect(claimSource).toContain('contact the platform administrator');
+      expect(claimSource).not.toContain('support@neargrid.in');
     });
   });
 });

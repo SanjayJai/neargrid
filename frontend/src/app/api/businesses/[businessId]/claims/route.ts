@@ -29,7 +29,7 @@ export async function POST(
 
   return bffError(
     'CLAIM_UPLOAD_UNAVAILABLE',
-    'Self-serve claim submission is disabled pending secure claimant document upload pipeline integration. Please contact support@neargrid.in for manual verification.',
+    'Self-serve claim submission is disabled pending secure claimant document upload pipeline integration. Please contact the platform administrator for manual verification.',
     501
   );
 }

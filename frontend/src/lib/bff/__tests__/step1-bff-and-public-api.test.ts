@@ -39,6 +39,7 @@ import { GET as getOwnerBusiness } from '@/app/api/owner/businesses/[businessId]
 import { POST as uploadBusinessMedia } from '@/app/api/owner/businesses/[businessId]/media/route';
 import { DELETE as deleteBusinessMedia } from '@/app/api/owner/businesses/[businessId]/media/[mediaId]/route';
 import { GET as downloadKycDocument } from '@/app/api/owner/businesses/[businessId]/kyc-documents/[docId]/download/route';
+import { POST as postBusinessClaim } from '@/app/api/businesses/[businessId]/claims/route';
 
 function makeCsrfHeaders(extra: Record<string, string> = {}) {
   const csrf = generateCsrfToken();
@@ -416,5 +417,69 @@ describe('Step 1: Authenticated Owner BFF, Multipart Media & Private KYC Proxies
     expect(res.status).toBe(502);
     const json = (await res.json()) as { error?: { code?: string } };
     expect(json.error?.code).toBe('UNTRUSTED_SIGNED_URL');
+  });
+
+  describe('Step 4 Security Review: Business Claim BFF endpoint', () => {
+    it('returns HTTP 401 when an unauthenticated user attempts to submit a claim', async () => {
+      mockCurrentSession = null;
+
+      const res = await postBusinessClaim(
+        new Request(`http://localhost:3000/api/businesses/${VALID_BIZ_ULID}/claims`, {
+          method: 'POST',
+          headers: makeCsrfHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            proof_file_path_private: 'kyc/2026/test.pdf',
+            claim_notes: 'Owner verification',
+          }),
+        }),
+        { params: { businessId: VALID_BIZ_ULID } }
+      );
+
+      expect(res.status).toBe(401);
+      const json = (await res.json()) as { error?: { code?: string } };
+      expect(json.error?.code).toBe('UNAUTHENTICATED');
+    });
+
+    it('returns HTTP 501 CLAIM_UPLOAD_UNAVAILABLE with zero Laravel upstream calls when an authenticated user submits a claim', async () => {
+      const activeToken = '55|sanctum_claimant_token';
+      mockCurrentSession = {
+        opaqueSessionId: 'sess_claimant_123456789012345678901234567890',
+        record: {
+          accessToken: activeToken,
+          sessionId: '01JCG4K8N5P2Q7R9S1T3V5W7A1',
+          userPublicId: '01JCG4K8N5P2Q7R9S1T3V5W7A2',
+          expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+          createdAt: new Date().toISOString(),
+        },
+      };
+
+      const upstreamFetchSpy = vi.fn();
+      global.fetch = upstreamFetchSpy;
+
+      const res = await postBusinessClaim(
+        new Request(`http://localhost:3000/api/businesses/${VALID_BIZ_ULID}/claims`, {
+          method: 'POST',
+          headers: makeCsrfHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({
+            proof_file_path_private: 'kyc/2026/fake-path.pdf',
+            claim_notes: 'Legitimate owner claim',
+          }),
+        }),
+        { params: { businessId: VALID_BIZ_ULID } }
+      );
+
+      expect(res.status).toBe(501);
+      const json = (await res.json()) as {
+        status: string;
+        error?: { code?: string; message?: string };
+      };
+      expect(json.status).toBe('error');
+      expect(json.error?.code).toBe('CLAIM_UPLOAD_UNAVAILABLE');
+      expect(json.error?.message).toContain('platform administrator');
+      expect(json.error?.message).not.toContain('support@neargrid.in');
+
+      // Verify that no upstream Laravel call was made and no claim was created in database
+      expect(upstreamFetchSpy).not.toHaveBeenCalled();
+    });
   });
 });

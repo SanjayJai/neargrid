@@ -29,7 +29,7 @@ interface BusinessClaimModalProps {
  *   pipeline for non-owner claimants (existing KYC upload requires already owning the business).
  * - To prevent claimants from submitting arbitrary strings, fabricated references, or
  *   cross-tenant private storage paths, self-serve online claim submission is kept disabled.
- * - Non-owner claimants are directed to NearGrid administrative support with verified
+ * - Non-owner claimants are directed to platform administrators with verified
  *   registration documents (GSTIN / Trade License) for manual ownership assignment.
  * - Submitting a claim does not immediately grant ownership.
  *
@@ -95,7 +95,7 @@ export function BusinessClaimModal({
             Claim {businessName}
           </h2>
           <p className="mt-1 text-xs text-ink-muted">
-            Ownership is transferred only after NearGrid administrators verify authentic legal documentation.
+            Ownership is transferred only after platform administrators verify authentic legal documentation.
           </p>
         </div>
 
@@ -161,25 +161,21 @@ export function BusinessClaimModal({
               </div>
               <p className="mt-1">
                 If you are the rightful proprietor or authorized manager of <strong>{businessName}</strong>,
-                our administrative team will assist you with manual verification and ownership assignment:
+                please contact the platform administrator to initiate manual ownership verification:
               </p>
               <ul className="mt-2.5 list-disc space-y-1.5 pl-4 text-[11px] text-ink-muted">
                 <li>
-                  Email your ownership documentation to{' '}
-                  <a
-                    href="mailto:support@neargrid.in?subject=Business%20Claim%20Verification"
-                    className="font-semibold text-brand-700 hover:underline"
-                  >
-                    support@neargrid.in
-                  </a>
-                  .
+                  Contact the platform administrator with official registration credentials.
                 </li>
                 <li>
-                  Include listing identifier:{' '}
+                  Provide your business registration documents (such as GSTIN Certificate, Udyam Registration, or Trade License).
+                </li>
+                <li>
+                  Reference listing identifier:{' '}
                   <code className="font-mono font-semibold text-ink">{businessPublicId}</code>.
                 </li>
                 <li>
-                  Our compliance team will review your business credentials and transfer listing access.
+                  Authorized administrators will audit your documentation and transfer listing access.
                 </li>
               </ul>
             </div>
