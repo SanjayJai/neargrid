@@ -15,7 +15,7 @@ erDiagram
     USERS ||--o{ BUSINESSES : owns
     USERS ||--o{ REVIEWS : authors
     USERS ||--o{ ENQUIRIES : submits
-    USERS ||--o{ USER_BOOKMARKS : saves
+    USERS ||--o{ SAVED_BUSINESSES : saves
 
     STATES ||--o{ CITIES : contains
     CITIES ||--o{ LOCALITIES : contains
@@ -319,7 +319,7 @@ erDiagram
         varchar report_reason
     }
 
-    USER_BOOKMARKS {
+    SAVED_BUSINESSES {
         bigint user_id PK,FK
         bigint business_id PK,FK
         timestamp created_at

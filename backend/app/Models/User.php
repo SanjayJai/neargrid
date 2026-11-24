@@ -97,6 +97,16 @@ class User extends Authenticatable
         return $this->morphMany(CustomerNotification::class, 'notifiable')->latest();
     }
 
+    /**
+     * @return BelongsToMany<Business, $this>
+     */
+    public function savedBusinesses(): BelongsToMany
+    {
+        return $this->belongsToMany(Business::class, 'saved_businesses')
+            ->withPivot('created_at')
+            ->orderByPivot('created_at', 'desc');
+    }
+
     public function hasRole(string $roleName): bool
     {
         if ($this->relationLoaded('roles')) {

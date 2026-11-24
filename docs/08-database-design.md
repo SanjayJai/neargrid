@@ -230,10 +230,10 @@ Hierarchical taxonomy supporting 2–3 levels (e.g., `Healthcare` -> `Dentists` 
 * Columns: `id`, `public_id` (`CHAR(26) UNIQUE`), `business_id` (`FK CASCADE`), `user_id` (`FK RESTRICT`), `rating` (`TINYINT UNSIGNED NOT NULL`, `CHECK (rating BETWEEN 1 AND 5)`), `title` (`VARCHAR(160) NULL`), `body` (`TEXT NOT NULL`), `sub_ratings` (`JSON NULL` — e.g., `{"quality":5,"value":4}`), `is_verified_interaction` (`BOOLEAN DEFAULT 0`), `moderation_status` (`ENUM('pending','approved','flagged','rejected') DEFAULT 'approved'`), `helpful_count` (`INT UNSIGNED DEFAULT 0`), `owner_reply` (`TEXT NULL`), `owner_replied_at` (`TIMESTAMP NULL`), `moderated_by_admin_id` (`FK SET NULL`), `created_at`, `updated_at`, `deleted_at`.
 * **Indexes:** `INDEX(business_id, moderation_status, created_at DESC)`, `INDEX(business_id, moderation_status, rating)`, `INDEX(user_id, business_id, created_at)` (used to enforce 1 review per business per 30 days).
 
-#### `review_media`, `review_votes`, `user_bookmarks`
+#### `review_media`, `review_votes`, `saved_businesses` (formerly `user_bookmarks`)
 * `review_media`: `id`, `review_id` (`FK CASCADE`), `webp_full_path`, `webp_thumb_path`, `moderation_status`, `created_at`.
 * `review_votes`: `review_id` (`FK CASCADE`), `user_id` (`FK CASCADE`), `vote_type` (`ENUM('helpful','report')`), `report_reason` (`VARCHAR(255) NULL`), `created_at`. `PRIMARY KEY(review_id, user_id, vote_type)`.
-* `user_bookmarks`: `user_id` (`FK CASCADE`), `business_id` (`FK CASCADE`), `created_at`. `PRIMARY KEY(user_id, business_id)`.
+* `saved_businesses`: `user_id` (`FK CASCADE`), `business_id` (`FK CASCADE`), `created_at`. `PRIMARY KEY(user_id, business_id)`, `INDEX(user_id, created_at)`, `INDEX(business_id)`. Enforces database-level uniqueness for saved bookmarks per customer.
 
 ---
 

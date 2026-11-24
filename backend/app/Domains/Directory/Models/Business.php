@@ -239,6 +239,15 @@ class Business extends Model
         return $this->hasMany(Review::class)->latest();
     }
 
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function savedByUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'saved_businesses')
+            ->withPivot('created_at');
+    }
+
     public function isPubliclyVisible(): bool
     {
         return $this->status === BusinessStatus::Active && ! $this->trashed();
@@ -328,7 +337,7 @@ class Business extends Model
      */
     public function scopePublished(Builder $query): Builder
     {
-        return $query->where('status', BusinessStatus::Active->value);
+        return $query->where($query->qualifyColumn('status'), BusinessStatus::Active->value);
     }
 
     /**

@@ -258,9 +258,10 @@ All communication between Next.js and Laravel routes through secure server-side 
 | `GET` | `/api/v1/businesses/{publicId}/reviews` | Public | Cursor-paginated approved reviews (`?sort=recent\|highest\|helpful&cursor=...`). |
 | `POST` | `/api/v1/businesses/{publicId}/reviews` | Bearer (`customer`) | Creates review (`rating` 1..5, `title`, `body` min 20 chars, `sub_ratings`, optional photo uploads). Enforces 1 review per business per 30 days. |
 | `POST` | `/api/v1/reviews/{publicId}/vote` | Bearer (`customer`) | Marks review `helpful` or submits `report` with reason. |
-| `GET` | `/api/v1/account/bookmarks` | Bearer (`customer`) | Lists customer's bookmarked businesses. |
-| `PUT` | `/api/v1/account/bookmarks/{businessPublicId}` | Bearer (`customer`) | Idempotently adds business to bookmarks. |
-| `DELETE` | `/api/v1/account/bookmarks/{businessPublicId}` | Bearer (`customer`) | Removes bookmark (`204 No Content`). |
+| `GET` | `/api/v1/account/saved-businesses` | Bearer (`customer`) | Paginated list of customer's saved businesses (`?page=1&per_page=15`). Only returns active, published listings. |
+| `GET` | `/api/v1/account/saved-businesses/ids` | Bearer (`customer`) | Lightweight array of saved business public ULIDs for UI badges without model hydration. |
+| `PUT`, `POST` | `/api/v1/account/saved-businesses/{businessPublicId}` | Bearer (`customer`) | Idempotently saves a business to bookmarks. |
+| `DELETE` | `/api/v1/account/saved-businesses/{businessPublicId}` | Bearer (`customer`) | Idempotently removes a business from bookmarks (`204 No Content`). |
 
 ---
 

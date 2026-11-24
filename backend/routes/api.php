@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\Account\SavedBusinessController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
 use App\Http\Controllers\Api\V1\Admin\AdminReviewController;
@@ -132,6 +133,14 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::post('/mark-all-read', [CustomerNotificationController::class, 'markAllAsRead'])->name('mark-all-read');
             Route::patch('/{notification}/read', [CustomerNotificationController::class, 'markAsRead'])->name('read');
             Route::delete('/{notification}', [CustomerNotificationController::class, 'destroy'])->name('destroy');
+        });
+
+        // Customer saved businesses (bookmarks)
+        Route::prefix('account/saved-businesses')->name('account.saved-businesses.')->group(function (): void {
+            Route::get('/', [SavedBusinessController::class, 'index'])->name('index');
+            Route::get('/ids', [SavedBusinessController::class, 'ids'])->name('ids');
+            Route::match(['put', 'post'], '/{business}', [SavedBusinessController::class, 'save'])->name('save');
+            Route::delete('/{business}', [SavedBusinessController::class, 'destroy'])->name('destroy');
         });
 
         // Super Admin foundation endpoints (governance, moderation & audit)
