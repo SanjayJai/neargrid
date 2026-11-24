@@ -22,6 +22,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '@/modules/customer/lib/notifications-api';
+import { isSafeInternalNavigationUrl } from '@/modules/customer/lib/safe-navigation';
 
 interface NotificationBellFlyoutProps {
   user: UserDto | null;
@@ -197,7 +198,9 @@ export function NotificationBellFlyout({ user }: NotificationBellFlyoutProps) {
     setOpen(false);
 
     if (notification.action_url) {
-      router.push(notification.action_url);
+      if (isSafeInternalNavigationUrl(notification.action_url)) {
+        router.push(notification.action_url);
+      }
     } else {
       router.push('/notifications');
     }

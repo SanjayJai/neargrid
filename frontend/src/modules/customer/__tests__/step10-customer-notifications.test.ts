@@ -3,6 +3,8 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME, generateCsrfToken } from '@/lib/bff/csrf';
 import { MemoryBffSessionStore, type BffSessionRecord } from '@/lib/bff/session-store';
+import { isSafeInternalNavigationUrl } from '@/modules/customer/lib/safe-navigation';
+import { sanitizeInternalRedirectPath } from '@/modules/customer/components/OtpLoginForm';
 
 const FRONTEND_SRC = path.resolve(__dirname, '../../..');
 
@@ -553,8 +555,157 @@ describe('Stage 1 Milestone 3: Customer Notification Centre & Secure BFF Integra
       const source = fs.readFileSync(pagePath, 'utf-8');
 
       expect(source).toContain('getServerAuthenticatedUser');
-      expect(source).toContain("redirect('/login?returnTo=/notifications')");
+      expect(source).toContain("redirect('/login?next=/notifications')");
       expect(source).toContain('CustomerNotificationCentre');
+    });
+  });
+
+  describe('Safe Notification Action URLs & Internal Navigation Validation', () => {
+    it('accepts valid internal relative paths including queries and hash fragments', () => {
+      expect(isSafeInternalNavigationUrl('/dashboard/enquiries')).toBe(true);
+      expect(isSafeInternalNavigationUrl('/enquiries/01JCG4K8N5P2Q7R9S1T3V5W7E1?tab=leads#active')).toBe(true);
+      expect(isSafeInternalNavigationUrl('/chennai/business/t-nagar-plumbing')).toBe(true);
+      expect(isSafeInternalNavigationUrl('/notifications?status=unread&category=enquiry')).toBe(true);
+      expect(isSafeInternalNavigationUrl('/search?q=category:plumbing')).toBe(true);
+      expect(isSafeInternalNavigationUrl('/')).toBe(true);
+    });
+
+    it('rejects external URLs (HTTP, HTTPS, FTP)', () => {
+      expect(isSafeInternalNavigationUrl('https://attacker.com')).toBe(false);
+      expect(isSafeInternalNavigationUrl('http://attacker.com/dashboard')).toBe(false);
+      expect(isSafeInternalNavigationUrl('https://evil.com/notifications')).toBe(false);
+      expect(isSafeInternalNavigationUrl('ftp://files.example.com')).toBe(false);
+    });
+
+    it('rejects protocol-relative URLs (//)', () => {
+      expect(isSafeInternalNavigationUrl('//attacker.com')).toBe(false);
+      expect(isSafeInternalNavigationUrl('//attacker.com/enquiries')).toBe(false);
+      expect(isSafeInternalNavigationUrl('///evil.com')).toBe(false);
+    });
+
+    it('rejects backslash-based paths and obfuscated hostnames', () => {
+      expect(isSafeInternalNavigationUrl('/\\attacker.com')).toBe(false);
+      expect(isSafeInternalNavigationUrl('\\\\attacker.com')).toBe(false);
+      expect(isSafeInternalNavigationUrl('\\attacker.com')).toBe(false);
+      expect(isSafeInternalNavigationUrl('/dashboard\\enquiries')).toBe(false);
+    });
+
+    it('rejects javascript:, data:, and other dangerous schemes', () => {
+      expect(isSafeInternalNavigationUrl('javascript:alert(1)')).toBe(false);
+      expect(isSafeInternalNavigationUrl('/javascript:alert(1)')).toBe(false);
+      expect(isSafeInternalNavigationUrl('data:text/html,<script>alert(1)</script>')).toBe(false);
+      expect(isSafeInternalNavigationUrl('/data:text/html,evil')).toBe(false);
+      expect(isSafeInternalNavigationUrl('vbscript:msgbox(1)')).toBe(false);
+      expect(isSafeInternalNavigationUrl('file:///etc/passwd')).toBe(false);
+    });
+
+    it('rejects malformed URLs, control characters, non-strings, and empty values', () => {
+      expect(isSafeInternalNavigationUrl('')).toBe(false);
+      expect(isSafeInternalNavigationUrl('   ')).toBe(false);
+      expect(isSafeInternalNavigationUrl(null)).toBe(false);
+      expect(isSafeInternalNavigationUrl(undefined)).toBe(false);
+      expect(isSafeInternalNavigationUrl(123)).toBe(false);
+      expect(isSafeInternalNavigationUrl('/path\x00evil')).toBe(false);
+      expect(isSafeInternalNavigationUrl('/path\x1Fevil')).toBe(false);
+    });
+
+    it('ensures CustomerNotificationCentre guards router.push with isSafeInternalNavigationUrl', () => {
+      const centrePath = path.join(
+        FRONTEND_SRC,
+        'modules/customer/components/CustomerNotificationCentre.tsx'
+      );
+      const source = fs.readFileSync(centrePath, 'utf-8');
+
+      expect(source).toContain('isSafeInternalNavigationUrl');
+      expect(source).toContain('isSafeInternalNavigationUrl(notification.action_url)');
+      expect(source).toContain('router.push(notification.action_url)');
+    });
+
+    it('ensures NotificationBellFlyout guards router.push with isSafeInternalNavigationUrl', () => {
+      const flyoutPath = path.join(
+        FRONTEND_SRC,
+        'modules/customer/components/NotificationBellFlyout.tsx'
+      );
+      const source = fs.readFileSync(flyoutPath, 'utf-8');
+
+      expect(source).toContain('isSafeInternalNavigationUrl');
+      expect(source).toContain('isSafeInternalNavigationUrl(notification.action_url)');
+    });
+
+    it('simulates action click behaviour: invalid action URL preserves mark-as-read but prevents navigation', () => {
+      const mockRouterPush = vi.fn();
+      const mockMarkRead = vi.fn();
+
+      function simulateActionClick(
+        notification: { id: string; action_url: string | null; is_read: boolean },
+        push: (url: string) => void,
+        markRead: (id: string) => void
+      ) {
+        if (!notification.is_read) {
+          markRead(notification.id);
+        }
+        if (notification.action_url && isSafeInternalNavigationUrl(notification.action_url)) {
+          push(notification.action_url);
+        }
+      }
+
+      // Test with malicious javascript: URL
+      simulateActionClick(
+        { id: VALID_NOTIFICATION_UUID, action_url: 'javascript:alert(1)', is_read: false },
+        mockRouterPush,
+        mockMarkRead
+      );
+      expect(mockMarkRead).toHaveBeenCalledWith(VALID_NOTIFICATION_UUID);
+      expect(mockRouterPush).not.toHaveBeenCalled();
+
+      // Test with malicious external HTTPS URL
+      mockMarkRead.mockClear();
+      mockRouterPush.mockClear();
+      simulateActionClick(
+        { id: VALID_NOTIFICATION_UUID, action_url: 'https://attacker.com/phish', is_read: false },
+        mockRouterPush,
+        mockMarkRead
+      );
+      expect(mockMarkRead).toHaveBeenCalledWith(VALID_NOTIFICATION_UUID);
+      expect(mockRouterPush).not.toHaveBeenCalled();
+
+      // Test with valid internal relative URL
+      mockMarkRead.mockClear();
+      mockRouterPush.mockClear();
+      simulateActionClick(
+        { id: VALID_NOTIFICATION_UUID, action_url: '/dashboard/enquiries', is_read: false },
+        mockRouterPush,
+        mockMarkRead
+      );
+      expect(mockMarkRead).toHaveBeenCalledWith(VALID_NOTIFICATION_UUID);
+      expect(mockRouterPush).toHaveBeenCalledWith('/dashboard/enquiries');
+    });
+  });
+
+  describe('Login Return Path & Open-Redirect Immunity', () => {
+    it('redirects unauthenticated notification centre access to /login?next=/notifications', () => {
+      const pagePath = path.join(
+        FRONTEND_SRC,
+        'app/(customer)/notifications/page.tsx'
+      );
+      const source = fs.readFileSync(pagePath, 'utf-8');
+
+      expect(source).toContain("redirect('/login?next=/notifications')");
+      expect(source).not.toContain('returnTo=');
+    });
+
+    it('preserves existing open-redirect protection and safely resolves /notifications', () => {
+      // Safe internal next returns itself
+      expect(sanitizeInternalRedirectPath('/notifications')).toBe('/notifications');
+      expect(sanitizeInternalRedirectPath('/dashboard/settings')).toBe('/dashboard/settings');
+
+      // Malicious or external next values default safely to /dashboard/settings
+      expect(sanitizeInternalRedirectPath('https://attacker.com')).toBe('/dashboard/settings');
+      expect(sanitizeInternalRedirectPath('//attacker.com')).toBe('/dashboard/settings');
+      expect(sanitizeInternalRedirectPath('/\\attacker.com')).toBe('/dashboard/settings');
+      expect(sanitizeInternalRedirectPath(null)).toBe('/dashboard/settings');
+      expect(sanitizeInternalRedirectPath(undefined)).toBe('/dashboard/settings');
+      expect(sanitizeInternalRedirectPath('')).toBe('/dashboard/settings');
     });
   });
 });

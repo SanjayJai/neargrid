@@ -12,7 +12,7 @@ export default async function CustomerNotificationsPage() {
   const user = await getServerAuthenticatedUser();
 
   if (!user) {
-    redirect('/login?returnTo=/notifications');
+    redirect('/login?next=/notifications');
   }
 
   return (

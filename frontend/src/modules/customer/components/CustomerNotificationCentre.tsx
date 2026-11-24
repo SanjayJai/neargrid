@@ -31,6 +31,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from '@/modules/customer/lib/notifications-api';
+import { isSafeInternalNavigationUrl } from '@/modules/customer/lib/safe-navigation';
 
 interface CustomerNotificationCentreProps {
   initialUser: UserDto;
@@ -227,7 +228,7 @@ export function CustomerNotificationCentre({ initialUser }: CustomerNotification
     if (!notification.is_read) {
       handleMarkRead(notification.id);
     }
-    if (notification.action_url) {
+    if (notification.action_url && isSafeInternalNavigationUrl(notification.action_url)) {
       router.push(notification.action_url);
     }
   }
