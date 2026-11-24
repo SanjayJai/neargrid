@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Bell,
   Building2,
   ChevronDown,
   Crosshair,
@@ -19,6 +20,7 @@ import type { UserDto } from '@/lib/bff/types';
 import { bffFetch } from '@/shared/api/bff-client';
 import type { ReferenceCityDto } from '@/shared/api/directory-types';
 import { NearGridLogo } from '@/shared/ui/NearGridLogo';
+import { NotificationBellFlyout } from '@/modules/customer/components/NotificationBellFlyout';
 import {
   buildShareableSearchUrl,
   normalizeLocale,
@@ -299,6 +301,7 @@ export function CustomerHeader({ user, cities }: CustomerHeaderProps) {
           {/* Auth actions */}
           {user ? (
             <div className="flex items-center gap-2">
+              <NotificationBellFlyout user={user} />
               <Link
                 href="/dashboard/settings"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink hover:bg-gray-50"
@@ -330,6 +333,7 @@ export function CustomerHeader({ user, cities }: CustomerHeaderProps) {
 
         {/* Mobile Right Controls */}
         <div className="flex items-center gap-2 md:hidden">
+          {user && <NotificationBellFlyout user={user} />}
           <button
             type="button"
             onClick={() => handleToggleLocale(locale === 'en' ? 'ta' : 'en')}
@@ -417,6 +421,14 @@ export function CustomerHeader({ user, cities }: CustomerHeaderProps) {
 
             {user ? (
               <>
+                <Link
+                  href="/notifications"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-ink hover:bg-gray-100"
+                >
+                  <Bell className="h-4 w-4 text-brand-600" aria-hidden="true" />
+                  <span>{locale === 'ta' ? 'அறிவிப்புகள்' : 'Notifications'}</span>
+                </Link>
                 <Link
                   href="/dashboard/settings"
                   onClick={() => setMobileOpen(false)}

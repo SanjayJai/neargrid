@@ -23,6 +23,7 @@ import type { UserDto } from '@/lib/bff/types';
 import { bffFetch } from '@/shared/api/bff-client';
 import { useOwnerBusiness } from '@/modules/business/context/OwnerBusinessContext';
 import { CreateBusinessModal } from '@/modules/business/components/CreateBusinessModal';
+import { NotificationBellFlyout } from '@/modules/customer/components/NotificationBellFlyout';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -139,7 +140,8 @@ export function BusinessShell({ user, children }: BusinessShellProps) {
             </Link>
 
             {user ? (
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2 sm:gap-2.5">
+                <NotificationBellFlyout user={user} />
                 <span className="hidden text-xs font-medium text-zinc-700 md:inline">
                   {user.name ?? user.phone_e164}
                 </span>

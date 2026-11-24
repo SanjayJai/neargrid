@@ -6,9 +6,14 @@ import { BffSessionRecord, getBffSessionStore } from './session-store';
 
 const PUBLIC_ULID_REGEX = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
 const SAFE_SLUG_REGEX = /^[a-z0-9-]+$/;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isValidPublicUlid(value: string): boolean {
   return PUBLIC_ULID_REGEX.test(value);
+}
+
+export function isValidNotificationId(value: string): boolean {
+  return typeof value === 'string' && value.length === 36 && UUID_REGEX.test(value);
 }
 
 export function isValidSlug(value: string): boolean {
