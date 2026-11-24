@@ -75,12 +75,34 @@ class CustomDatabaseChannel extends DatabaseChannel
 
     protected function isDuplicateKeyException(QueryException $e): bool
     {
-        $sqlState = (string) $e->getCode();
-        $message = $e->getMessage();
+        // Extract the driver error message, stripping any appended SQL query text from QueryException
+        $driverMessage = $e->getPrevious() instanceof \Throwable
+            ? $e->getPrevious()->getMessage()
+            : explode(' (Connection:', $e->getMessage())[0];
 
-        return $sqlState === '23000'
-            || str_contains($message, 'UNIQUE constraint failed')
-            || str_contains($message, 'Duplicate entry')
-            || str_contains($message, '1062 Duplicate');
+        // 1. Explicitly exclude unrelated integrity errors (NOT NULL, Foreign Key)
+        if (str_contains($driverMessage, 'cannot be null') || str_contains($driverMessage, 'NOT NULL constraint failed')) {
+            return false;
+        }
+
+        if (str_contains($driverMessage, 'foreign key constraint') || str_contains($driverMessage, 'FOREIGN KEY constraint failed')) {
+            return false;
+        }
+
+        // 2. Must specifically be a unique constraint violation
+        $isUnique = str_contains($driverMessage, 'UNIQUE constraint failed')
+            || str_contains($driverMessage, 'Duplicate entry')
+            || str_contains($driverMessage, '1062 Duplicate');
+
+        if (! $isUnique) {
+            return false;
+        }
+
+        // 3. Must specifically target the deduplication unique constraint
+        // MySQL reports the key name 'notifications_dedup_unique'
+        // SQLite reports the composite columns 'notifications.deduplication_key'
+        return str_contains($driverMessage, 'notifications_dedup_unique')
+            || str_contains($driverMessage, 'notifications.deduplication_key')
+            || str_contains($driverMessage, 'deduplication_key');
     }
 }

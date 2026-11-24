@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Notifications;
 
+use App\Domains\Notifications\Channels\CustomDatabaseChannel;
 use App\Domains\Notifications\Enums\NotificationCategory;
 use App\Domains\Notifications\Models\CustomerNotification;
 use App\Domains\Notifications\Notifications\AccountSecurityNotification;
@@ -18,7 +19,9 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
+use ReflectionMethod;
 use Tests\TestCase;
 
 final class NotificationDeduplicationAndQueueTest extends TestCase
@@ -192,5 +195,102 @@ final class NotificationDeduplicationAndQueueTest extends TestCase
             $actual = CancellationReasonMapper::toCustomerFacingMessage($adminReason);
             $this->assertEquals($expectedCustomerCopy, $actual);
         }
+    }
+
+    public function test_different_deduplication_keys_create_separate_records(): void
+    {
+        $notif1 = new EnquirySubmittedNotification(111, '01HQENQ111', 'Carpentry');
+        $notif2 = new EnquirySubmittedNotification(222, '01HQENQ222', 'Electrical');
+
+        $this->user->notify($notif1);
+        $this->user->notify($notif2);
+
+        $this->assertEquals(2, $this->user->notifications()->count());
+    }
+
+    public function test_repeated_identical_keys_for_same_recipient_do_not_create_duplicates(): void
+    {
+        $notif = new EnquirySubmittedNotification(333, '01HQENQ333', 'Painting');
+
+        $this->user->notify($notif);
+        $this->user->notify($notif);
+        $this->user->notify($notif);
+
+        $this->assertEquals(1, $this->user->notifications()->count());
+    }
+
+    public function test_not_null_violation_propagates_normally_through_custom_database_channel(): void
+    {
+        $channel = app(CustomDatabaseChannel::class);
+
+        $invalidNotification = new class extends Notification
+        {
+            public function via($n): array
+            {
+                return [CustomDatabaseChannel::class];
+            }
+
+            public function toArray($n): ?array
+            {
+                return null;
+            }
+        };
+        $invalidNotification->id = (string) Str::uuid();
+
+        $this->expectException(QueryException::class);
+        $channel->send($this->user, $invalidNotification);
+    }
+
+    public function test_different_unique_constraint_violation_propagates_normally(): void
+    {
+        $channel = app(CustomDatabaseChannel::class);
+
+        $existing = CustomerNotification::create([
+            'id' => (string) Str::uuid(),
+            'type' => EnquirySubmittedNotification::class,
+            'notifiable_type' => $this->user->getMorphClass(),
+            'notifiable_id' => $this->user->id,
+            'category' => NotificationCategory::Enquiry->value,
+            'deduplication_key' => 'unique:pk:test:1',
+            'data' => ['title' => 'Existing', 'message' => 'First message'],
+        ]);
+
+        $collisionNotification = new class extends Notification
+        {
+            public function via($n): array
+            {
+                return [CustomDatabaseChannel::class];
+            }
+
+            public function toArray($n): array
+            {
+                return ['title' => 'Collision', 'message' => 'Second message'];
+            }
+
+            public function deduplicationKey($n): string
+            {
+                return 'unique:pk:test:DIFFERENT_KEY';
+            }
+        };
+        $collisionNotification->id = $existing->id;
+
+        $this->expectException(QueryException::class);
+        $channel->send($this->user, $collisionNotification);
+    }
+
+    public function test_foreign_key_violation_propagates_normally(): void
+    {
+        $channel = app(CustomDatabaseChannel::class);
+        $ref = new ReflectionMethod($channel, 'isDuplicateKeyException');
+        $ref->setAccessible(true);
+
+        $fkException = new QueryException(
+            'mysql',
+            'insert into notifications ...',
+            [],
+            new \Exception('Cannot add or update a child row: a foreign key constraint fails (`local_biz`.`notifications`, CONSTRAINT `notifications_user_fk` FOREIGN KEY (`notifiable_id`) REFERENCES `users` (`id`))', 23000)
+        );
+
+        $this->assertFalse($ref->invoke($channel, $fkException));
     }
 }
