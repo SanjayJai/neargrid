@@ -2,13 +2,24 @@
 
 ## 1. Architectural Overview & Guardrails
 
-The `frontend/` application is a single **Next.js 14.2.35 (App Router) + React 18.3.1 + TypeScript 5.7 + Tailwind CSS 3.4** web application serving both the public customer discovery portal and the business-owner dashboard via isolated Route Groups. The custom **Laravel Blade Admin Dashboard** remains strictly separate in `backend/` at `/admin` (**zero Filament**).
+The `frontend/` application is a single **Next.js 14.2.35 (App Router) + React 18.3.1 + TypeScript 5.7 + Tailwind CSS 3.4** web application delivering three strictly separated experiences via isolated Route Groups:
+
+1. **Customer Web Application (`src/app/(customer)/*`)**: Public SEO discovery, two-field autocomplete search, canonical directory hierarchies (`/[city]/[category]`, `/[city]/[locality]/[category]`), storefront profiles (`/[city]/business/[slug]`), DPDP-compliant enquiry capture, and customer reviews.
+2. **Business Owner Dashboard (`src/app/(business)/*` / `/dashboard`)**: Dedicated merchant portal with isolated shell layout, navigation, Inbound Lead CRM, split-shift hours, services, photo gallery, and KYC verification history.
+3. **Super Admin Dashboard (`src/app/(admin)/*` / `/admin` — Phase 3F)**: Dedicated administrative governance experience with separate layout, navigation, and role-based access control, consuming the authoritative Laravel Admin REST APIs (`/api/v1/admin/*`). Strictly **zero Filament dependencies**.
+
+### Location Architecture & Launch Configuration
+* **Geographical Hierarchy:** Strict `State` → `City` → `Location/Locality`. Country management is intentionally omitted.
+* **Deployment Modes:** Configurable **Single-Location Mode** and **Multi-Location Mode** to support focused local deployments or multi-city expansion.
+* **Initial Launch Location:** **Vellore**, with Chennai seeded as reference urban center.
+* **Integrated Capabilities:** Powers customer proximity search, merchant address registration, directory listing hierarchies, and canonical SEO URL generation (`/{city}/{category}`).
 
 ### Security & Architecture Invariants (Preserved Unchanged)
 1. **Zero Browser Token Exposure:** Sanctum Bearer tokens remain strictly inside AES-256-GCM encrypted server-side Redis sessions (`lbd_sid` opaque `HttpOnly; SameSite=Lax` cookie). Never exposed to browser JS, `localStorage`, `sessionStorage`, React props, or client API payloads.
 2. **CSRF & Origin Defense:** Every authenticated browser mutation (`POST`, `PUT`, `PATCH`, `DELETE`) passes through Next.js BFF route handlers enforcing strict `Origin`/`Referer` + constant-time double-submit CSRF token (`lbd_csrf` + `X-CSRF-Token`).
-3. **Independent Laravel Policies:** All owner mutations and private KYC operations are authorized independently by Laravel Policies (`BusinessPolicy`, `BusinessServicePolicy`, `BusinessMemberPolicy`, `BusinessMediaPolicy`, `KycDocumentPolicy`).
+3. **Independent Laravel Policies:** All owner mutations and private KYC operations are authorized independently by Laravel Policies (`BusinessPolicy`, `BusinessServicePolicy`, `BusinessMemberPolicy`, `BusinessMediaPolicy`, `KycDocumentPolicy`, `BusinessVerificationPolicy`, `UserPolicy`, `AuditLogPolicy`).
 4. **Original NearGrid Branding:** Recreates the familiar high-utility Indian local business directory UX (Justdial-style density, scannability, dual-axis search, horizontal listing cards, sticky profile tabs) using **100% original NearGrid branding, palette, Lucide icons, and copy** — zero Justdial logos, trademarks, assets, or source code.
+5. **Preserved Stage 1 Scope:** Strictly no ecommerce, marketplace checkout, or consumer mobile apps are introduced into Stage 1.
 
 ---
 

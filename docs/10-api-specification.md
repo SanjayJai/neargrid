@@ -5,10 +5,10 @@
 This document defines the versioned REST API contract exposed by the **Laravel 13 Backend** (`/api/v1/*`). It serves three consumers simultaneously with zero client-specific branching:
 
 1. **Next.js Customer Portal** (`(customer)` route group)
-2. **Next.js Business Owner Dashboard** (`(business)` route group)
-3. **Future Flutter Mobile Applications** (iOS & Android)
+2. **Next.js Business Owner Dashboard** (`(business)` route group / `/dashboard`)
+3. **Next.js Super Admin Dashboard** (`(admin)` route group in Phase 3F via `/api/v1/admin/*`)
 
-All admin operations remain outside `/api/v1/*` inside the session-authenticated **Laravel Blade Admin Dashboard** (`/admin/*`).
+All communication between Next.js and Laravel routes through secure server-side BFF route handlers. Sanctum Bearer tokens are kept in encrypted server sessions/cookies and are never exposed in browser `localStorage`.
 
 ---
 
@@ -128,7 +128,7 @@ All admin operations remain outside `/api/v1/*` inside the session-authenticated
 ### 4.2 Token Scopes (Coarse Capability Gates Only)
 * **Customer Token (`customer`):** `customer:read`, `customer:review`, `customer:enquiry`, `customer:bookmark`.
 * **Business Owner Token (`business_owner`):** All `customer:*` abilities + `owner:business:manage`, `owner:leads:manage`, `owner:reviews:reply`, `owner:billing:manage`.
-* **Admin Accounts:** Never receive `/api/v1/*` admin privileges; admin actions execute exclusively via `/admin/*` Blade session guard + TOTP 2FA.
+* **Admin Accounts:** Authenticate against `/api/v1/admin/*` through the Next.js Super Admin BFF (`/api/admin/*`). Enforces active account checks, Sanctum token abilities, and granular database RBAC (`super_admin`, `kyc_verifier`, `moderator`, `support`). Token values are strictly protected server-side with zero browser `localStorage` exposure.
 
 ### 4.3 Independent Policy-Based Authorization & IDOR Protection
 **Critical Security Invariant:** Sanctum token abilities act strictly as **coarse-grained capability gates** — they **never** substitute for object-level authorization.

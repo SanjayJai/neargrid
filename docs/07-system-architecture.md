@@ -4,11 +4,14 @@
 
 This document defines the cleanroom system architecture for our independent local business directory platform. It translates Phase 1 discovery insights into a production-ready, maintainable blueprint built on the approved technology stack:
 
-* **Frontend Web & Business Portal:** Single **Next.js (App Router) + React 18 + TypeScript + Tailwind CSS** application with isolated `(customer)` and `(business)` route groups.
-* **Backend API:** Modular **Laravel 13 REST API** with stateless **Bearer token authentication** (Laravel Sanctum).
-* **Admin Dashboard:** Custom **Laravel Blade + Tailwind CSS** dashboard inside the Laravel backend (**strictly no Filament**).
+* **Frontend Experiences (Unified Next.js 14+ App Router):** Three strictly isolated web experiences:
+  1. **Customer Web Portal** (`(customer)` route group).
+  2. **Business Owner CRM** (`(business)` route group / `/dashboard`).
+  3. **Super Admin Dashboard** (`(admin)` route group / `/admin` — scheduled for Phase 3F, zero Filament).
+* **Backend API:** Modular **Laravel 13 REST API** serving stateless **Bearer token authentication** (Laravel Sanctum) and authoritative `/api/v1/admin/*` governance endpoints.
+* **Super Admin Governance:** Developed in **Next.js (Phase 3F)** consuming the existing, tested Laravel Admin REST APIs (`/api/v1/admin/*`), preserving **strictly zero Filament dependencies**.
 * **Database & Cache:** **MySQL 8.0** (InnoDB with Spatial & FullText indexes) + **Redis 7** (cache, queues, rate limiting, autocomplete).
-* **Future Mobile Clients:** **Flutter (iOS & Android)** consuming the exact same versioned `/api/v1/*` REST API.
+* **Location Architecture:** State → City → Locality (no country management), configurable single/multi-location modes, launching initially in **Vellore**.
 
 ---
 
@@ -18,13 +21,13 @@ Before committing architectural choices, we strictly separate directly verified 
 
 | Topic | Directly Confirmed in Phase 1 | Assumptions / Unverified Justdial Internals | Our Cleanroom Architecture Decision |
 | :--- | :--- | :--- | :--- |
-| **Frontend Framework & SSR** | `robots.txt` explicitly disallows `/_next/`, confirming Next.js usage alongside legacy PHP paths (`/functions/`, `PHPSESSID`). | Exact Next.js version, internal micro-frontend boundaries, and page-by-page migration status. | Pure **Next.js (App Router) + React 18 + TypeScript** with SSR/ISR for public SEO pages and authenticated client views for business owners. |
+| **Frontend Framework & SSR** | `robots.txt` explicitly disallows `/_next/`, confirming Next.js usage alongside legacy PHP paths (`/functions/`, `PHPSESSID`). | Exact Next.js version, internal micro-frontend boundaries, and page-by-page migration status. | Pure **Next.js (App Router) + React 18 + TypeScript** with SSR/ISR for public SEO pages and authenticated client views for business owners and super admin. |
 | **Bot Shield & CDN** | HTTP probes confirmed AkamaiGHost, Akamai Bot Manager (`_abck`, `bm_sz`), and AkamaiNetStorage on `akam.cdn.jdmagicbox.com`. | Internal WAF rule sets and edge-caching TTLs. | Use Cloudflare / Nginx edge caching + application-layer rate limiting (Redis) without blocking legitimate SEO crawlers. |
 | **JS Bundle & Source Maps** | REA MCP inspection of downloaded `static.127777.com/public/minjs/webfont.min.js` (16,587 bytes) confirmed Web Font Loader v1.5.18 and no `sourceMappingURL`. | Internal webpack chunk contents of protected search/profile bundles (blocked from automated browser inspection because Chrome DevTools remote debugging was inactive and Akamai gated non-browser requests). | Strip public source maps in production builds; upload private source maps to Sentry for server-side error symbolication only. |
 | **Homepage Search & Taxonomy** | Homepage HTML confirmed `#city`, `#srchbx`, `#insrch` inputs, `ContextualHotkey` (60 categories using `URLDYNCITY` + `_fil`/`nct-*`), and `HomePageSeoLink` (24 links). | Dynamic trending search ranking algorithm and homepage personalization rules. | Clean hierarchical `categories` & `cities`/`localities` tables with clean SEO slugs (no legacy `_fil` or `nct-*` tokens) and Redis-backed trending query aggregation. |
 | **Search & Profile UI Layouts** | HTTP `301` confirmed `/Mumbai/Dentists` -> `/Mumbai/search?q=Dentists&stype=company_list&filters=[{"e":"100","v":["Distance"]}]&v=nctol`. | Exact live DOM layout of filter sidebar, listing cards, 5-photo mosaic, review histogram, and FAQ accordions (inferred from public secondary sources & directory conventions, not directly rendered in browser). | Design clean, accessible, mobile-first Tailwind CSS components tailored to user needs rather than mimicking legacy DOM structures. |
 | **Free Listing & On-Blur Lead Capture** | `/free-listing` HTML confirmed inputs (`cn`, `flcity`, `fname`, `lname`, `fmb0`, `fph0`, 6-digit `pin_0..5`) and `onblur="hotLeadApi('mobile_inputfield_onblur')"`. | Exact payload and backend retention rules of `hotLeadApi`, internal lead broadcast quotas, and telephony masking vendor. | **Reject silent on-blur PII capture.** Enforce explicit consent-first enquiry submission and OTP verification compliant with DPDP Act 2023 / GDPR (see `13-security-and-privacy.md`). |
-| **API Architecture** | `robots.txt` disclosed path prefixes (`/api/india_api_read`, `/api/india_api_write`, `/gapi/ratings`, `/bestdeals_chatbot/`). | Actual request/response JSON schemas, auth headers, and internal microservice topology. | Design a clean, versioned `/api/v1/*` REST API in Laravel 13 optimized for both Next.js and future Flutter clients. |
+| **API Architecture** | `robots.txt` disclosed path prefixes (`/api/india_api_read`, `/api/india_api_write`, `/gapi/ratings`, `/bestdeals_chatbot/`). | Actual request/response JSON schemas, auth headers, and internal microservice topology. | Design a clean, versioned `/api/v1/*` REST API in Laravel 13 optimized for both Next.js and future clients. |
 
 ---
 
@@ -32,24 +35,23 @@ Before committing architectural choices, we strictly separate directly verified 
 
 ```mermaid
 flowchart TB
-    subgraph Clients["Client Layer"]
-        C1["Browser: Customer Portal<br/>(Next.js Route Group: customer)"]
-        C2["Browser: Business Owner Portal<br/>(Next.js Route Group: business)"]
-        C3["Future Mobile Apps<br/>(Flutter iOS & Android)"]
-        C4["Admin Browser<br/>(Custom Laravel Blade Admin)"]
+    subgraph Clients["Client Layer (Next.js App Router)"]
+        C1["Browser: Customer Portal<br/>(Route Group: (customer))"]
+        C2["Browser: Business Owner Portal<br/>(Route Group: (business))"]
+        C3["Browser: Super Admin Dashboard<br/>(Phase 3F: Route Group: (admin))"]
     end
 
     subgraph Edge["Edge & Routing Layer"]
         CDN["CDN & WAF<br/>(Cloudflare / Nginx Reverse Proxy)"]
     end
 
-    subgraph Frontend["Frontend Application (Separate App)"]
-        NEXT["Next.js App Server<br/>(React 18 + TS + Tailwind)<br/>SSR / ISR + BFF Auth Cookie Bridge"]
+    subgraph Frontend["Frontend Application (Unified Next.js 14+)"]
+        NEXT["Next.js App Server<br/>(React 18 + TS + Tailwind)<br/>SSR / ISR + BFF Auth Bridge (Zero localStorage Tokens)"]
     end
 
-    subgraph Backend["Backend Application (Separate App - Modular Laravel 13)"]
-        API["REST API Layer<br/>(/api/v1/* - Sanctum Bearer Auth)"]
-        ADMIN["Custom Admin UI<br/>(/admin/* - Blade + Session + 2FA)"]
+    subgraph Backend["Backend Application (Modular Laravel 13)"]
+        API["Public & Merchant REST APIs<br/>(/api/v1/* - Sanctum Bearer Auth)"]
+        ADMIN["Super Admin REST APIs<br/>(/api/v1/admin/* - RBAC + Sanctum)"]
         DOM["Shared Domain Services & Actions<br/>(Directory, Search, Leads, Reviews, Billing)"]
         WORK["Queue Workers & Scheduler<br/>(Supervisor / Horizon)"]
     end
@@ -58,6 +60,23 @@ flowchart TB
         MYSQL[("MySQL 8.0<br/>Spatial + FullText")]
         REDIS[("Redis 7<br/>Cache, Queues, Rate Limits")]
         S3PUB[("S3 Public Bucket + CDN<br/>Optimized WebP/AVIF Media")]
+        S3PRIV[("S3 Private Encrypted Bucket<br/>KYC Documents & Invoices")]
+    end
+
+    C1 --> NEXT
+    C2 --> NEXT
+    C3 --> NEXT
+    NEXT --> CDN
+    CDN --> API
+    CDN --> ADMIN
+    API --> DOM
+    ADMIN --> DOM
+    DOM --> MYSQL
+    DOM --> REDIS
+    DOM --> S3PUB
+    DOM --> S3PRIV
+    WORK --> DOM
+```
         S3PRIV[("S3 Private Encrypted Bucket<br/>KYC Verification Documents")]
     end
 
@@ -181,27 +200,42 @@ backend/
 │   │   └── Governance/        # Banners, Redirects, Audit Logs, Moderation Queues
 │   ├── Http/
 │   │   ├── Controllers/Api/V1/# Thin REST API Controllers (FormRequests + JsonResources)
-│   │   ├── Controllers/Admin/ # Thin Laravel Blade Admin Controllers
-│   │   └── Middleware/        # RBAC, Admin 2FA, Rate Limiters, Request ID
-│   └── Policies/              # Resource Authorization (Ownership & Role checks)
-├── resources/views/admin/     # Custom Laravel Blade Admin Views + Tailwind CSS
+│   │   │   └── Admin/         # Super Admin Governance REST Controllers (/api/v1/admin/*)
+│   │   └── Middleware/        # RBAC, Rate Limiters, Request ID, Active User Guard
+│   └── Policies/              # Resource Authorization (Ownership, Staff, & Admin Role checks)
 └── routes/
-    ├── api.php                # Versioned /api/v1/* stateless endpoints
-    └── admin.php              # Session-authenticated /admin/* Blade routes
+    └── api.php                # Stateless endpoints (/api/v1/* and /api/v1/admin/*)
 ```
 
 ---
 
-### ADR-03: Custom Laravel Blade Admin Dashboard (No Filament)
+### ADR-03: Next.js Super Admin Dashboard via Authoritative Laravel Admin APIs (Zero Filament)
 
-* **Decision:** Implement the internal operations panel using **Laravel Blade + Tailwind CSS** (with lightweight progressive enhancement via Alpine.js where interactive tables/modals help), completely excluding Filament.
+* **Decision:** Implement the administrative governance UI entirely in **Next.js (Phase 3F)** as a dedicated experience (`src/app/(admin)/*` route group), reusing the existing, tested **Laravel 13 Admin REST APIs** (`/api/v1/admin/*`). Strictly **no Filament dependencies, resources, or panels** are permitted.
 * **Why Recommended:**
-  1. **Explicit Stack Alignment:** Adheres strictly to the approved stack with zero Filament dependencies, Livewire overhead, or vendor lock-in.
-  2. **Custom Operations Workflows:** KYC verification (viewing encrypted S3 documents via short-lived signed URLs side-by-side with business metadata), review moderation queues, and sponsored campaign approvals are cleaner and faster to tailor in direct Blade + Tailwind views.
-  3. **Security Isolation:** Runs on a dedicated Laravel `admin` session guard with strict CSRF protection, TOTP 2FA, and optional VPN/IP allowlisting, decoupled from public Bearer token APIs.
+  1. **Unified Modern Frontend:** Leverages the team's Next.js 14+ App Router, React 18, and Tailwind design system across all three platform experiences (Customer, Business Owner, Super Admin).
+  2. **Authoritative API Reuse:** Directly consumes the `/api/v1/admin/*` endpoints completed in Phase 3C (Enquiries, Reviews moderation, KYC queue with 60s signed URLs, User session termination, Immutable audit logs) without duplicating business rules.
+  3. **Strict Zero Filament Compliance:** Eliminates heavy Livewire / Filament overhead, keeping the backend as a clean, modular REST API.
+  4. **Security & BFF Isolation:** Administrative browser requests authenticate through Next.js server-side BFF route handlers (`/api/admin/*`). Sanctum personal access tokens are stored in encrypted `HttpOnly` server cookies/sessions and are **never exposed to client JavaScript or localStorage**.
 * **Alternatives Considered:**
-  * *Filament:* Explicitly rejected by approved architecture policy.
-  * *Admin Panel inside Next.js:* Forces exposing high-privilege administrative endpoints over public CORS/API infrastructure and increases frontend surface area.
+  * *Laravel Blade Admin:* Initially considered, but replaced in favor of a cohesive Next.js experience in Phase 3F to streamline frontend component sharing.
+  * *Filament Admin Panel:* Explicitly prohibited by core architecture principles.
+
+---
+
+### ADR-05: Hierarchical Location Architecture & Launch Configuration
+
+* **Decision:** Enforce a strict three-tier geographical hierarchy: `State` → `City` → `Location/Locality`. Country management is intentionally omitted from the data model.
+* **Key Design Rules:**
+  1. **No Country Management:** The platform is purpose-built for high-density regional directory deployments without unnecessary country tables or country-level routing complexity.
+  2. **Configurable Deployment Modes:** Supports **Single-Location Mode** (focused on a single municipality or district) and **Multi-Location Mode** (regional, statewide, or multi-city expansion) via environment/config toggle.
+  3. **Initial Launch Location:** **Vellore**, with Chennai seeded as reference urban center.
+  4. **Core Capabilities Supported:**
+     * **Proximity & Spatial Search:** Geocoded `POINT(lng, lat)` coordinates on localities and businesses with MySQL 8.0 `SRID 4326` spatial indexes.
+     * **SEO URL Canonicalization:** Clean canonical routes `/[city]/[category]` and `/[city]/[locality]/[category]`.
+     * **Merchant Registration:** Merchants select from verified localities within the supported city during listing onboarding.
+* **Why Recommended:**
+  * Prevents over-engineering international multi-country structures while delivering high-precision local discovery in initial target cities.
 
 ---
 

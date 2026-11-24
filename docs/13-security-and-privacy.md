@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-This document specifies the security controls, OTP authentication lifecycle, privacy-compliant enquiry workflows, custom Laravel Blade admin hardening, and infrastructure safeguards for our local business directory.
+This document specifies the security controls, OTP authentication lifecycle, privacy-compliant enquiry workflows, Super Admin governance hardening, and infrastructure safeguards for our local business directory.
 
 ### Crucial Privacy Contrast with Phase 1 Observations
 During Phase 1 discovery, we confirmed that Justdial's `/free-listing` form attaches `onblur="hotLeadApi('mobile_inputfield_onblur')"` to its mobile phone input field. **Our cleanroom platform explicitly rejects silent, unconsented PII transmission on input blur.**
@@ -117,16 +117,16 @@ sequenceDiagram
 * Every protected endpoint must include automated Pest negative tests asserting `403`/`404` when an authenticated user with valid token abilities attempts cross-account IDOR access.
 * Mass assignment protection: Explicit `$fillable` whitelists on all Eloquent models; critical flags (`is_verified`, `is_trusted`, `status`, `rating_avg`, `owner_user_id`) are **never** mass-assignable from user requests.
 
-### 4.2 Custom Laravel Blade Admin Dashboard Hardening (`/admin/*`)
-Because the admin dashboard manages sensitive KYC documents, verification badges, and user bans, it receives elevated defense-in-depth controls:
-1. **Dedicated Authentication Guard:** Uses Laravel's `admin` session guard (separate from `/api/v1/*` Sanctum tokens) with strict `HttpOnly`, `Secure`, `SameSite=Strict` session cookies and short idle timeout (30 minutes).
-2. **Mandatory TOTP 2FA:** Every admin role (`super_admin`, `kyc_verifier`, `moderator`, `support`) must enroll an authenticator app (`totp_secret_encrypted`) before accessing any admin module.
-3. **Granular RBAC Middleware:**
-   * `kyc_verifier`: Can view verification queues and approve/reject `is_verified` badges; cannot alter payment plans or delete users.
-   * `moderator`: Can moderate reviews, media, and spam reports; cannot view KYC documents.
-   * `super_admin`: Full configuration, role assignments, and audit log inspection.
-4. **Network Isolation (Recommended for Production):** Restrict `/admin/*` at Nginx/Cloudflare edge via IP allowlist or Zero-Trust Access (Cloudflare Access / WireGuard VPN).
-5. **Immutable Audit Trail:** Every state-changing admin action writes a structured `audit_logs` entry capturing `actor_user_id`, `action`, `old_values`, `new_values`, and `ip_address`.
+### 4.2 Super Admin Dashboard & Governance API Hardening (`/api/v1/admin/*` and Next.js `(admin)`)
+Because the admin dashboard manages sensitive KYC documents, verification badges, and user account actions, it receives elevated defense-in-depth controls:
+1. **Server-Side BFF Token Isolation:** The Next.js Super Admin application (`src/app/(admin)/*`, scheduled for Phase 3F) interacts with `/api/v1/admin/*` exclusively through server-side BFF route handlers (`/api/admin/*`). Sanctum tokens are stored in encrypted `HttpOnly; SameSite=Lax` server sessions — **never exposed in browser localStorage, sessionStorage, or client JavaScript**.
+2. **Mandatory TOTP 2FA & Active Guard:** Every admin role (`super_admin`, `kyc_verifier`, `moderator`, `support`) must maintain verified active status and TOTP 2FA before executing governance actions.
+3. **Granular Server-Side RBAC Policies:**
+   * `kyc_verifier`: Can view verification queues and approve/reject verification badges via `/api/v1/admin/verifications/*`; cannot suspend users or moderate reviews.
+   * `moderator`: Can moderate reviews and content via `/api/v1/admin/reviews/*`; cannot view KYC documents.
+   * `super_admin`: Full governance authority across users, enquiries, reviews, verifications, and audit logs.
+4. **Network Isolation (Recommended for Production):** Restrict `/admin/*` and admin API paths at Nginx/Cloudflare edge via IP allowlist or Zero-Trust Access (Cloudflare Access / WireGuard VPN).
+5. **Immutable Audit Trail:** Every state-changing admin action writes a structured `audit_logs` entry capturing `actor_user_id`, `actor_role`, `action`, `old_values`, `new_values`, and `ip_address`. Audit logs are strictly append-only with no modification or deletion APIs.
 
 ### 4.3 File Upload & KYC Document Security
 * **Public Media (Business & Review Photos):**
@@ -136,7 +136,7 @@ Because the admin dashboard manages sensitive KYC documents, verification badges
 * **Private KYC Documents (GSTIN, PAN, Licenses, Utility Bills):**
   * Uploaded directly to a **private, server-side-encrypted (SSE-S3 / KMS) S3 bucket** with `Block Public Access = ON`.
   * Stored `document_number_encrypted` uses Laravel's AES-256-GCM `encrypted` cast.
-  * Admin KYC reviewers never receive permanent URLs; the Blade admin generates **60-second pre-signed S3 URLs** on demand and logs every KYC document view in `audit_logs`.
+  * Admin KYC reviewers never receive permanent URLs; the admin API issues **60-second actor-bound pre-signed download URLs** on demand via `/api/v1/admin/businesses/{id}/kyc-documents/{doc}/signed-url` and logs every KYC document view in `audit_logs`.
 
 ### 4.4 Injection, XSS, CSRF & Payment Webhook Integrity
 * **SQL Injection:** 100% parameterized queries via Eloquent/Query Builder; all dynamic `sort` and filter keys validated against strict PHP `enum` whitelists.
@@ -170,4 +170,4 @@ Because the admin dashboard manages sensitive KYC documents, verification badges
 | **Consent-First Enquiries (No On-Blur PII Capture)** | Complies with DPDP Act 2023 & GDPR, builds consumer trust, eliminates unsolicited spam complaints. | Silent `onblur` capture (observed on Justdial `/free-listing`) — high legal/compliance liability and poor user trust. |
 | **Next.js BFF `HttpOnly` Cookie Bridge for Sanctum Bearer** | Protects web users from XSS token theft while keeping Laravel's Bearer API 100% compatible with Flutter. | `localStorage` Bearer storage (XSS risk) or Sanctum SPA cookie-only auth (diverges from Flutter Bearer path). |
 | **Private S3 + 60s Signed URLs for KYC Docs** | Zero risk of public KYC leak even if filenames are guessed; full access auditability. | Public S3 with obscure UUID paths ("security by obscurity" — unacceptable for PAN/GSTIN documents). |
-| **Mandatory TOTP 2FA + Separate Session Guard for Blade Admin** | Isolates high-privilege moderation/KYC operations from public API token surface. | Password-only admin login or exposing admin CRUD over `/api/v1/*`. |
+| **Server-Side BFF Token Isolation + RBAC Policies for Admin** | Isolates high-privilege governance actions with zero Bearer token exposure in client localStorage. | Exposing admin tokens in browser `localStorage` or unauthenticated admin APIs. |

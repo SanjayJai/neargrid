@@ -102,6 +102,13 @@ Ephemeral security table for OTP lifecycle (pruned nightly after 24h).
 
 ### 3.2 Domain: Geography & Locations
 
+> **Approved Location Architecture Invariants:**
+> 1. **Strict Hierarchy:** `State` → `City` → `Location/Locality`.
+> 2. **No Country Management:** Country management tables and routing are intentionally omitted to keep the schema lean and hyper-focused on regional directory utility.
+> 3. **Configurable Deployment Modes:** Supports **Single-Location Mode** (e.g., launching in a single municipality) and **Multi-Location Mode** (regional or multi-city expansion) via application configuration.
+> 4. **Initial Launch Location:** **Vellore**, with Chennai seeded as reference urban center.
+> 5. **Core Application Functions:** Existing tables and foreign key relationships (`states`, `cities`, `localities`) directly power customer proximity/spatial search (`SRID 4326`), merchant onboarding address selection, canonical directory route generation (`/[city]/[category]`), and regional SEO metadata.
+
 #### `states`
 * Columns: `id`, `country_code` (`CHAR(2)`, default `'IN'`), `name` (`VARCHAR(100)`), `slug` (`VARCHAR(120)`), `is_active` (`BOOLEAN`).
 * **Indexes:** `UNIQUE(country_code, slug)`.

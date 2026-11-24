@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-This document presents the technological discoveries from auditing Justdial's public web architecture and details the cleanroom engineering specifications for our independent platform. It documents observations made via HTTP probing, DOM inspection, robots metadata analysis, and binary/bundle analysis using the **REA MCP server**. It then specifies our cleanroom architecture separating the **Next.js Customer Web Application**, **Next.js Business Owner Dashboard**, **Laravel 13 REST API**, **Custom Laravel Blade Admin**, and future **Flutter Mobile Apps**.
+This document presents the technological discoveries from auditing Justdial's public web architecture and details the cleanroom engineering specifications for our independent platform. It documents observations made via HTTP probing, DOM inspection, robots metadata analysis, and binary/bundle analysis using the **REA MCP server**. It then specifies our cleanroom architecture separating the **Next.js Customer Web Application**, **Next.js Business Owner Dashboard**, **Next.js Super Admin Dashboard (Phase 3F)**, **Laravel 13 REST API**, and future **Flutter Mobile Apps**.
 
 ---
 
@@ -59,24 +59,22 @@ To build a high-performance, maintainable directory application without legacy d
 
 ```mermaid
 flowchart TD
-    subgraph Client Applications
-        A[Customer Web Portal: Next.js + React 18 + TS + Tailwind]
-        B[Business Owner Dashboard: Next.js + React 18 + TS + Tailwind]
-        C[Future Mobile Apps: Flutter iOS & Android]
+    subgraph Frontend Applications (Next.js App Router)
+        A["Customer Web Portal: src/app/(customer)"]
+        B["Business Owner Dashboard: src/app/(business)"]
+        C["Super Admin Dashboard (Phase 3F): src/app/(admin)"]
     end
 
     subgraph Backend Infrastructure
         D[Laravel 13 REST API: Bearer Token Auth via Sanctum]
-        E[Custom Admin Panel: Laravel 13 Blade Templates + Tailwind CSS]
         F[MySQL 8.0: Spatial & FullText Indexes]
         G[Redis: Session Cache & High-Speed Autocomplete]
         H[Storage: S3-Compatible Object Store for Photos]
     end
 
-    A -->|JSON REST over HTTPS| D
-    B -->|Bearer Auth REST API| D
-    C -->|Bearer Auth REST API| D
-    E -->|Internal Eloquent ORM| F
+    A -->|BFF /api/* + Server Fetch| D
+    B -->|BFF /api/owner/* + HttpOnly Cookie| D
+    C -->|BFF /api/admin/* + HttpOnly Cookie| D
     D --> F
     D --> G
     D --> H
@@ -86,23 +84,35 @@ flowchart TD
 
 ## 5. Architectural Separation of Applications
 
-### 5.1 Application 1: Customer Web Portal (`apps/web`)
-* **Stack**: Next.js 14+ (App Router), React 18, TypeScript, Tailwind CSS, TanStack Query (React Query).
-* **Role**: High-traffic, SEO-optimized public portal.
-* **Rendering Strategy**:
-  * **SSR / ISR**: Category directories (`/[city]/[category]`) and business profile pages (`/[city]/[slug]`) use Incremental Static Regeneration with revalidation timeouts to achieve sub-100ms response times for crawlers.
-  * **CSR (Client-Side)**: Interactive search filtering, geolocation resolution, dynamic enquiry modals, and rating submissions.
+### 5.1 Frontend Experiences (Unified Next.js 14+ App Router)
+The frontend provides three strictly isolated web experiences with separate route groups, layouts, navigation, and access controls:
 
-### 5.2 Application 2: Business Owner Dashboard (`apps/business`)
-* **Stack**: Next.js 14+ (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons, Headless UI.
-* **Role**: Secure Single Page Application (SPA) for registered merchants to manage their digital storefront and respond to incoming leads.
-* **Authentication**: Bearer tokens stored in secure `HttpOnly` cookies.
+1. **Customer Web Application (`src/app/(customer)/*`)**:
+   * **Role**: High-traffic, SEO-optimized public discovery portal.
+   * **Rendering Strategy**:
+     * **SSR / ISR**: Category directories (`/[city]/[category]`), locality directories (`/[city]/[locality]/[category]`), and business profiles (`/[city]/business/[slug]`) using on-demand ISR revalidation via signed webhooks.
+     * **CSR (Client-Side)**: Interactive search filtering, debounced autocomplete, and DPDP-compliant enquiry modals.
+2. **Business Owner Dashboard (`src/app/(business)/*` / `/dashboard`)**:
+   * **Role**: Authenticated merchant portal for managing listings, opening hours, services, photo gallery, lead CRM, and KYC verification.
+   * **Authentication**: Sanctum Bearer tokens bridged through server-side Next.js BFF route handlers into `HttpOnly; SameSite=Lax` cookies — never exposed in browser `localStorage`.
+3. **Super Admin Dashboard (`src/app/(admin)/*` / `/admin` — Phase 3F)**:
+   * **Role**: Dedicated administrative governance dashboard developed in Next.js (zero Filament dependencies).
+   * **Integration**: Reuses the authoritative Laravel 13 Admin APIs (`/api/v1/admin/*`) for KYC verifications queue, review moderation, user status suspension, session termination, and immutable audit logs.
 
-### 5.3 Application 3: Laravel 13 REST API & Custom Blade Admin (`apps/api`)
-* **Stack**: Laravel 13, PHP 8.3+, MySQL 8.0, Redis, Laravel Sanctum for Bearer tokens.
+### 5.2 Backend Architecture (Laravel 13 REST API)
+* **Stack**: Laravel 13, PHP 8.3+, MySQL 8.0, Redis 7, Laravel Sanctum.
 * **Separation**:
-  * **API Layer**: Stateless `/api/v1/` routes returning JSON payloads for Next.js and Flutter clients.
-  * **Custom Admin Layer**: Server-rendered `/admin/` routes using **Laravel Blade** templates and Tailwind CSS. **No Filament dependencies, resources, or panels are used.**
+  * **Public APIs**: `/api/v1/locations/*`, `/api/v1/categories`, `/api/v1/search/*`, `/api/v1/businesses/*`.
+  * **Merchant APIs**: `/api/v1/owner/*` protected by Sanctum and strict Laravel Policies.
+  * **Super Admin APIs**: `/api/v1/admin/*` protected by Sanctum, active user status check, and granular RBAC (`super_admin`, `kyc_verifier`, `moderator`).
+  * **Server-Side BFF**: Next.js communicates with Laravel strictly server-side. Sanctum personal access tokens are stored in encrypted server sessions/cookies and are never leaked to client JavaScript.
+
+### 5.3 Location Architecture
+* **Hierarchy**: Strict `State` → `City` → `Location/Locality`.
+* **No Country Management**: The platform operates with focused regional models without extraneous country tables.
+* **Deployment Modes**: Configurable single-location (e.g. single municipality) and multi-location (statewide/nationwide) modes.
+* **Initial Launch Location**: **Vellore**, with Chennai seeded as reference urban center.
+* **Capabilities**: Powers customer proximity search, merchant address registration, directory listing hierarchies, and canonical SEO URL generation (`/{city}/{category}`).
 
 ---
 

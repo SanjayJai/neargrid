@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-This document maps the end-to-end user journeys and lead monetization workflows discovered on Justdial. It covers the **Customer Enquiry & Lead Capture Funnel**, the **Hot Lead Trigger on Blur**, the **Business Merchant Onboarding (Free Listing)**, the **Business Owner Lead Management Dashboard**, the **Custom Laravel Blade Admin Moderation Flow**, and the **Customer Review Submission Loop**.
+This document maps the end-to-end user journeys and lead monetization workflows discovered on Justdial. It covers the **Customer Enquiry & Lead Capture Funnel**, the **Consent-First Lead Generation Flow**, the **Business Merchant Onboarding (Free Listing)**, the **Business Owner Lead Management Dashboard**, the **Super Admin Governance Flow (Next.js Dashboard via Laravel Admin APIs)**, and the **Customer Review Submission Loop**.
 
 ---
 
@@ -16,26 +16,24 @@ sequenceDiagram
     participant API as Laravel 13 REST API
     participant DB as MySQL Database
     actor Merchant as Business Owner (Next.js Dashboard)
-    actor Admin as Platform Admin (Laravel Blade)
+    actor Admin as Super Admin (Next.js Admin Dashboard)
 
     Note over Customer, Merchant: Flow 1: Lead Generation & Multi-Vendor Broadcast
     Customer->>Web: Searches category & clicks "Get Best Deal"
-    Web->>Customer: Opens Enquiry Modal (Service, Timing, Name, Phone)
-    Customer->>Web: Enters mobile number & blurs input field
-    Web->>API: POST /api/v1/enquiries/hot-lead (Preliminary Intent Capture)
+    Web->>Customer: Opens Enquiry Modal (Service, Timing, Name, Phone, DPDP Consent)
     Customer->>Web: Submits Form & Verifies 6-digit OTP
-    Web->>API: POST /api/v1/enquiries/confirm
+    Web->>API: POST /api/v1/enquiries
     API->>DB: Stores Enquiry & Matches Verified Merchants
     API-->>Merchant: Push Notification / SMS / Realtime Lead Notification
     Merchant->>API: Views Lead in Business Owner Dashboard
 
     Note over Merchant, Admin: Flow 2: Merchant Registration & Admin Audit
     Merchant->>Web: Submits "Free Listing" Application
-    Web->>API: POST /api/v1/merchant/register
-    API->>DB: Creates Unverified Business Record (Status: Pending)
-    Admin->>API: Reviews KYC & Business Documents in Laravel Blade Admin
-    Admin->>API: Approves Listing & Grants "Verified Badge"
-    API->>DB: Updates is_verified = true
+    Web->>API: POST /api/v1/owner/businesses
+    API->>DB: Creates Unverified Business Record (Status: Pending Review)
+    Admin->>API: Reviews KYC & Business Documents in Next.js Super Admin Dashboard
+    Admin->>API: POST /api/v1/admin/verifications/{id}/review (Approves & Grants Badges)
+    API->>DB: Updates is_verified = true, is_trusted = true, status = active
 ```
 
 ---
@@ -124,23 +122,27 @@ Built as a dedicated standalone Next.js application (`apps/business`):
 
 ---
 
-### 3.5 Platform Admin Workflow (Custom Laravel Blade Dashboard)
+### 3.5 Super Admin Workflow (Next.js Admin Dashboard in Phase 3F)
 
-Built entirely in **Laravel Blade** (no Filament) inside the Laravel backend application:
+Built entirely in **Next.js** (`src/app/(admin)/*` route group, zero Filament), consuming the existing and authoritative **Laravel 13 Admin REST APIs** (`/api/v1/admin/*`):
 
 1. **Authentication & RBAC**:
-   * Secure session-based login (`/admin/login`) with role-based access control (Super Admin, Moderator, KYC Verifier).
-2. **Listing Verification Queue**:
-   * Table of newly registered businesses awaiting verification.
-   * Document viewer for GSTIN certificates, trade licenses, utility bills.
-   * Actions: **Approve & Grant "JD Verified"**, **Grant "JD Trust"**, or **Reject with Reason**.
-3. **Review Moderation**:
-   * Flagged and newly submitted reviews awaiting sentiment / spam check.
-   * Actions: Approve, Hide, Delete, or Notify User.
-4. **Category & Taxonomy Management**:
-   * Create, update, reorder categories, icons, and SEO metadata.
-5. **Lead Distribution Rules Engine**:
-   * Configure lead routing algorithms (maximum vendors per broadcast, category quotas, priority for sponsored merchants).
+   - Secure login through Next.js server-side BFF route handlers with token isolation (Sanctum tokens stored in encrypted HTTP-only server sessions, never exposed to browser `localStorage`).
+   - Role-based access control enforcing strict server-side policies for `super_admin`, `kyc_verifier`, `moderator`, and `support`.
+2. **Listing & KYC Verification Queue**:
+   - Queue of newly submitted business verifications (`GET /api/v1/admin/verifications`).
+   - Private document review using actor-bound, 60-second temporary signed URLs (`GET /api/v1/admin/businesses/{business}/kyc-documents/{doc}/signed-url`).
+   - Actions: Approve & award "Verified" / "Trust" badges (`POST /api/v1/admin/verifications/{id}/review`), or reject with structured reasons.
+3. **Review & Content Moderation**:
+   - Filterable queue of platform reviews (`GET /api/v1/admin/reviews`).
+   - Actions: Approve, Hide, Reject, or Delete (`PATCH /api/v1/admin/reviews/{id}/moderation`) with automatic Bayesian rating recalculation.
+4. **User & Session Management**:
+   - User account status management (`PATCH /api/v1/admin/users/{id}/status`) with instant Sanctum token invalidation and session termination upon suspension.
+   - Emergency session revocation (`POST /api/v1/admin/users/{id}/revoke-sessions`).
+5. **Immutable Governance Audit Logs**:
+   - Read-only inspection feed (`GET /api/v1/admin/audit-logs`) tracking all administrative decisions.
+6. **Lead & Enquiry Abuse Management**:
+   - Enquiries inspection (`GET /api/v1/admin/enquiries`) and administrative cancellation (`PATCH /api/v1/admin/enquiries/{id}/cancel`).
 
 ---
 

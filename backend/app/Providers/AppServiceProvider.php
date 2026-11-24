@@ -16,6 +16,7 @@ use App\Domains\Identity\Services\NullOtpSender;
 use App\Domains\Leads\Models\Enquiry;
 use App\Domains\Media\Models\BusinessMedia;
 use App\Domains\Media\Models\KycDocument;
+use App\Domains\Notifications\Channels\CustomDatabaseChannel;
 use App\Domains\Search\Contracts\SearchEngineInterface;
 use App\Domains\Search\Engines\MysqlSearchEngine;
 use App\Models\User;
@@ -32,6 +33,7 @@ use App\Policies\UserDevicePolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Channels\DatabaseChannel;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -43,6 +45,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(OtpSender::class, NullOtpSender::class);
         $this->app->bind(SearchEngineInterface::class, MysqlSearchEngine::class);
+        $this->app->bind(DatabaseChannel::class, CustomDatabaseChannel::class);
     }
 
     public function boot(): void

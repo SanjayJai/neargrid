@@ -23,7 +23,7 @@ In Phase 1, we confirmed that Justdial relies heavily on city-scoped URLs (`/Mum
 | **Free Listing Landing** | `/list-your-business` | `/list-your-business` | `index, follow` |
 | **Business Owner Dashboard** | `/dashboard/*` (route group `(business)`) | `/dashboard/leads` | `noindex, nofollow` |
 | **Customer Account** | `/account/*` | `/account/bookmarks` | `noindex, nofollow` |
-| **Custom Blade Admin** | `/admin/*` | `/admin/verifications` | `noindex, nofollow` + `Disallow` |
+| **Super Admin Dashboard** | `/admin/*` (route group `(admin)`) | `/admin/verifications` | `noindex, nofollow` + `Disallow` |
 
 ### 2.2 Architecture Decision: Explicit `/business/` Segment vs. Flat `/{city}/{slug}`
 

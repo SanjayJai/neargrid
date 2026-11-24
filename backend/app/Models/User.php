@@ -8,6 +8,7 @@ use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Identity\Models\Role;
 use App\Domains\Identity\Models\UserDevice;
+use App\Domains\Notifications\Models\CustomerNotification;
 use App\Support\Concerns\HasPublicUlid;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -85,6 +87,14 @@ class User extends Authenticatable
     public function businessMemberships(): HasMany
     {
         return $this->hasMany(BusinessMember::class);
+    }
+
+    /**
+     * @return MorphMany<CustomerNotification, $this>
+     */
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(CustomerNotification::class, 'notifiable')->latest();
     }
 
     public function hasRole(string $roleName): bool

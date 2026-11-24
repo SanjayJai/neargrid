@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\Leads\OwnerLeadController;
 use App\Http\Controllers\Api\V1\Leads\PublicEnquiryController;
 use App\Http\Controllers\Api\V1\Media\BusinessMediaController;
 use App\Http\Controllers\Api\V1\Media\KycDocumentController;
+use App\Http\Controllers\Api\V1\Notifications\CustomerNotificationController;
 use App\Http\Controllers\Api\V1\Search\SearchController;
 use App\Http\Controllers\Api\V1\SystemController;
 use Illuminate\Support\Facades\Route;
@@ -123,6 +124,15 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
         // Customer enquiry transparency portal
         Route::get('/account/enquiries', [PublicEnquiryController::class, 'customerEnquiries'])->name('account.enquiries');
+
+        // Customer notifications centre
+        Route::prefix('account/notifications')->name('account.notifications.')->group(function (): void {
+            Route::get('/', [CustomerNotificationController::class, 'index'])->name('index');
+            Route::get('/unread-count', [CustomerNotificationController::class, 'unreadCount'])->name('unread-count');
+            Route::post('/mark-all-read', [CustomerNotificationController::class, 'markAllAsRead'])->name('mark-all-read');
+            Route::patch('/{notification}/read', [CustomerNotificationController::class, 'markAsRead'])->name('read');
+            Route::delete('/{notification}', [CustomerNotificationController::class, 'destroy'])->name('destroy');
+        });
 
         // Super Admin foundation endpoints (governance, moderation & audit)
         Route::prefix('admin')->name('admin.')->group(function (): void {

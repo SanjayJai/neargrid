@@ -250,7 +250,7 @@ stateDiagram-v2
     RatingRecalculated --> LiveOnStorefront: Appears in GET /api/v1/businesses/{id}/reviews
     LiveOnStorefront --> OwnerReplied: Merchant submits official reply
     LiveOnStorefront --> Reported: Customer votes "report"
-    Reported --> Hidden: Admin hides review in Blade Admin
+    Reported --> Hidden: Admin hides review in Next.js Super Admin Dashboard
 ```
 
 ### 5.2 Database Schema & Constraints
@@ -413,21 +413,21 @@ flowchart TD
         A5["Automated Policy & Penetration Tests"]
     end
 
-    subgraph P3F["Phase 3D / 3F Scope (Frontend UI Screens)"]
+    subgraph P3F["Phase 3F Scope (Next.js Super Admin UI Screens)"]
         direction TB
-        B1["Custom Blade Admin Dashboard (Zero Filament)"]
-        B2["KYC Queue & Inline PDF/Image Viewer"]
+        B1["Next.js Super Admin Dashboard (src/app/(admin)/*, Zero Filament)"]
+        B2["KYC Queue & Inline PDF/Image Viewer via 60s Signed URLs"]
         B3["Review Moderation & Flagged Queue UI"]
         B4["Enquiry Abuse & SMS Fraud Console"]
-        B5["User & Merchant Management Grid"]
+        B5["User & Merchant Management Grid with Instant Session Revocation"]
         B6["Immutable Audit Log Explorer"]
     end
 
     P3C -->|Powers| P3F
 ```
 
-- **Phase 3C Delivers:** All database schemas, moderation states, backend REST APIs (`/api/v1/admin/*`), Laravel Policies, RBAC guards, and immutable audit logging.
-- **Phase 3D/3F Delivers:** The full user-facing administrative web interface (custom Laravel Blade + Tailwind UI screens, zero Filament). No admin UI screens will be built in Phase 3C; the backend will be completely ready for them.
+- **Phase 3C Delivers:** All database schemas, moderation states, backend REST APIs (`/api/v1/admin/*`), Laravel Policies, RBAC guards, immutable audit logging, and signed realtime ISR revalidation.
+- **Phase 3F Delivers:** The full user-facing administrative web interface built in Next.js (`src/app/(admin)/*`, zero Filament) consuming the existing `/api/v1/admin/*` APIs via server-side BFF route handlers. No admin UI screens were built in Phase 3C; the backend is 100% complete and tested for them.
 
 ---
 
