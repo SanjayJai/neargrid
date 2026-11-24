@@ -20,8 +20,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use ReflectionMethod;
+use RuntimeException;
 use Tests\TestCase;
 
 final class NotificationDeduplicationAndQueueTest extends TestCase
@@ -178,6 +180,50 @@ final class NotificationDeduplicationAndQueueTest extends TestCase
             $this->assertTrue($notification->afterCommit);
             $this->assertEquals('notifications', $notification->queue);
         }
+    }
+
+    public function test_transaction_rollback_aborts_queued_notification_and_creates_no_database_record(): void
+    {
+        $this->assertEquals(0, CustomerNotification::query()->count());
+
+        try {
+            DB::transaction(function () {
+                $this->user->notify(new EnquirySubmittedNotification(
+                    enquiryId: 9999,
+                    enquiryUlid: '01ROLLBACKENQ',
+                    categoryName: 'Dentists',
+                    targetBusinessName: 'Pearl Dental'
+                ));
+
+                // Before commit, verify no record was prematurely inserted
+                $this->assertEquals(0, CustomerNotification::query()->count());
+
+                throw new RuntimeException('Simulated transaction failure for rollback verification.');
+            });
+        } catch (RuntimeException $e) {
+            $this->assertSame('Simulated transaction failure for rollback verification.', $e->getMessage());
+        }
+
+        // After rollback: Laravel must have aborted the deferred afterCommit notification callback
+        $this->assertEquals(0, CustomerNotification::query()->count());
+        $this->assertDatabaseMissing('notifications', [
+            'deduplication_key' => 'enquiry:submitted:9999',
+        ]);
+
+        // Contrast: Within a successful committed transaction, the afterCommit notification executes normally
+        DB::transaction(function () {
+            $this->user->notify(new EnquirySubmittedNotification(
+                enquiryId: 8888,
+                enquiryUlid: '01COMMITTEDENQ',
+                categoryName: 'Dentists',
+                targetBusinessName: 'Pearl Dental'
+            ));
+        });
+
+        $this->assertEquals(1, CustomerNotification::query()->count());
+        $this->assertDatabaseHas('notifications', [
+            'deduplication_key' => 'enquiry:submitted:8888',
+        ]);
     }
 
     public function test_cancellation_reason_mapper_sanitizes_internal_admin_reasons(): void

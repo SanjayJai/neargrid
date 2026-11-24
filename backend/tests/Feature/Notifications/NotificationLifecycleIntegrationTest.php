@@ -314,6 +314,62 @@ final class NotificationLifecycleIntegrationTest extends TestCase
         Notification::assertNotSentTo($customer, EnquiryMatchedNotification::class);
     }
 
+    public function test_enquiry_matching_persistence_exception_rolls_back_and_dispatches_no_notification(): void
+    {
+        Notification::fake();
+
+        $customer = User::factory()->create([
+            'status' => 'active',
+            'phone_e164' => '+919840005556',
+        ]);
+
+        $enquiry = Enquiry::query()->create([
+            'user_id' => $customer->id,
+            'category_id' => $this->category->id,
+            'city_id' => $this->city->id,
+            'locality_id' => $this->locality->id,
+            'customer_name' => 'Failed Match User',
+            'phone_e164' => '+919840005556',
+            'requirement' => 'Root canal requirement during simulated failure',
+            'urgency' => 'within_week',
+            'enquiry_type' => 'broadcast',
+            'status' => EnquiryStatus::Active,
+            'consent_given' => true,
+            'consent_version' => '2026.1',
+            'consent_text' => 'Broadcast consent',
+            'consent_purpose' => 'lead_matching_and_contact',
+            'consent_timestamp' => now(),
+            'ip_address_hash' => hash('sha256', '127.0.0.1'),
+            'phone_verified_at' => now(),
+        ]);
+
+        $dispatcher = EnquiryRecipient::getEventDispatcher();
+        try {
+            EnquiryRecipient::creating(function () {
+                throw new \RuntimeException('Simulated persistence failure during recipient matching.');
+            });
+
+            try {
+                (new DispatchEnquiryLeadsJob($enquiry->id))->handle();
+                $this->fail('Expected exception was not thrown by DispatchEnquiryLeadsJob');
+            } catch (\RuntimeException $e) {
+                $this->assertSame('Simulated persistence failure during recipient matching.', $e->getMessage());
+            }
+        } finally {
+            EnquiryRecipient::setEventDispatcher($dispatcher);
+        }
+
+        // Confirms no notification dispatched
+        Notification::assertNotSentTo($customer, EnquiryMatchedNotification::class);
+        Notification::assertNothingSent();
+
+        // Confirms no partial recipient records remain after rollback
+        $this->assertSame(0, EnquiryRecipient::query()->where('enquiry_id', $enquiry->id)->count());
+
+        // Confirms enquiry was not marked as dispatched
+        $this->assertNull($enquiry->fresh()->dispatched_at);
+    }
+
     public function test_business_owner_updating_lead_status_notifies_customer_without_leaking_notes(): void
     {
         Notification::fake();
@@ -699,7 +755,17 @@ final class NotificationLifecycleIntegrationTest extends TestCase
             }
         );
 
-        // 2. Reactivate user
+        // 2. Repeated suspend update on already-suspended user -> no notification sent
+        Notification::fake();
+
+        $repeatSuspendResponse = $this->patchJson("/api/v1/admin/users/{$customer->public_id}/status", [
+            'status' => 'suspended',
+            'reason' => 'Repeated suspension call',
+        ]);
+        $repeatSuspendResponse->assertStatus(200);
+        Notification::assertNothingSent();
+
+        // 3. Reactivate user
         Notification::fake();
 
         $reactivateResponse = $this->patchJson("/api/v1/admin/users/{$customer->public_id}/status", [
@@ -717,6 +783,16 @@ final class NotificationLifecycleIntegrationTest extends TestCase
                     && $notification->extraMetadata['status'] === 'active';
             }
         );
+
+        // 4. Repeated active update on already-active user -> no notification sent
+        Notification::fake();
+
+        $repeatActiveResponse = $this->patchJson("/api/v1/admin/users/{$customer->public_id}/status", [
+            'status' => 'active',
+            'reason' => 'Confirming active status without transition',
+        ]);
+        $repeatActiveResponse->assertStatus(200);
+        Notification::assertNothingSent();
     }
 
     public function test_voluntary_logout_and_logout_all_do_not_trigger_security_notification(): void
