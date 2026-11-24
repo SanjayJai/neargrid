@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1\Leads;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Leads\Enums\LeadStatus;
 use App\Domains\Leads\Models\EnquiryRecipient;
+use App\Domains\Notifications\Notifications\LeadStatusUpdatedNotification;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Leads\ListOwnerLeadsRequest;
 use App\Http\Requests\Api\V1\Leads\UpdateOwnerLeadRequest;
@@ -54,18 +55,23 @@ final class OwnerLeadController extends Controller
         }
 
         $data = $request->validated();
+        $statusChanged = false;
+        $oldStatus = $lead->lead_status;
 
         if (isset($data['lead_status'])) {
             $newStatus = LeadStatus::from($data['lead_status']);
-            $lead->lead_status = $newStatus;
+            if ($oldStatus !== $newStatus) {
+                $statusChanged = true;
+                $lead->lead_status = $newStatus;
 
-            if ($newStatus === LeadStatus::Contacted && $lead->contacted_at === null) {
-                $lead->contacted_at = now();
-            }
+                if ($newStatus === LeadStatus::Contacted && $lead->contacted_at === null) {
+                    $lead->contacted_at = now();
+                }
 
-            if (! $lead->is_read) {
-                $lead->is_read = true;
-                $lead->read_at = now();
+                if (! $lead->is_read) {
+                    $lead->is_read = true;
+                    $lead->read_at = now();
+                }
             }
         }
 
@@ -111,6 +117,20 @@ final class OwnerLeadController extends Controller
         }
 
         $lead->save();
+
+        if ($statusChanged) {
+            $lead->loadMissing(['enquiry.user']);
+            if ($lead->enquiry?->user !== null) {
+                $lead->enquiry->user->notify(new LeadStatusUpdatedNotification(
+                    enquiryId: $lead->enquiry->id,
+                    enquiryUlid: $lead->enquiry->public_id,
+                    businessId: $business->id,
+                    businessName: $business->name,
+                    newStatus: $lead->lead_status->value
+                ));
+            }
+        }
+
         $lead->load(['enquiry.category', 'enquiry.city', 'enquiry.locality', 'assignedUser']);
 
         return ApiResponse::success(

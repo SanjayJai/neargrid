@@ -11,6 +11,7 @@ use App\Domains\Leads\Enums\EnquiryType;
 use App\Domains\Leads\Enums\LeadStatus;
 use App\Domains\Leads\Models\Enquiry;
 use App\Domains\Leads\Models\EnquiryRecipient;
+use App\Domains\Notifications\Notifications\EnquiryMatchedNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -45,6 +46,20 @@ class DispatchEnquiryLeadsJob implements ShouldQueue
             $enquiry->dispatched_at = now();
             $enquiry->save();
         });
+
+        // Notify customer only when recipients were successfully matched and dispatched
+        $enquiry->loadMissing(['user', 'locality', 'city']);
+        $recipientCount = $enquiry->recipients()->count();
+
+        if ($recipientCount > 0 && $enquiry->user !== null) {
+            $localityOrCity = $enquiry->locality?->name ?? $enquiry->city?->name ?? 'your area';
+            $enquiry->user->notify(new EnquiryMatchedNotification(
+                enquiryId: $enquiry->id,
+                enquiryUlid: $enquiry->public_id,
+                localityOrCity: $localityOrCity,
+                matchedCount: $recipientCount,
+            ));
+        }
     }
 
     private function dispatchDirect(Enquiry $enquiry): void

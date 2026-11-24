@@ -19,6 +19,9 @@ use App\Domains\Leads\Models\ContactReveal;
 use App\Domains\Leads\Models\Enquiry;
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
+use App\Domains\Notifications\Notifications\EnquiryCancelledNotification;
+use App\Domains\Notifications\Notifications\EnquirySubmittedNotification;
+use App\Domains\Notifications\Support\CancellationReasonMapper;
 use App\Domains\Taxonomy\Models\Category;
 use App\Models\User;
 use Illuminate\Http\Response;
@@ -133,6 +136,13 @@ final class EnquiryManagementService
             $this->hitRateLimits($phoneE164, $ipHash);
             DispatchEnquiryLeadsJob::dispatch($enquiry->id);
 
+            $actor->notify(new EnquirySubmittedNotification(
+                enquiryId: $enquiry->id,
+                enquiryUlid: $enquiry->public_id,
+                categoryName: $category->name,
+                targetBusinessName: $targetBusiness?->name,
+            ));
+
             return [
                 'enquiry' => $enquiry,
                 'requires_otp' => false,
@@ -210,6 +220,14 @@ final class EnquiryManagementService
 
         DispatchEnquiryLeadsJob::dispatch($enquiry->id);
 
+        $enquiry->loadMissing(['category', 'targetBusiness']);
+        $authResult['user']->notify(new EnquirySubmittedNotification(
+            enquiryId: $enquiry->id,
+            enquiryUlid: $enquiry->public_id,
+            categoryName: $enquiry->category->name,
+            targetBusinessName: $enquiry->targetBusiness?->name,
+        ));
+
         return [
             'enquiry' => $enquiry,
             'auth' => $authResult,
@@ -250,6 +268,16 @@ final class EnquiryManagementService
             oldValues: ['status' => $oldStatus],
             newValues: ['status' => 'cancelled', 'reason' => $reason]
         );
+
+        $enquiry->loadMissing('user');
+        if ($enquiry->user !== null) {
+            $safeReason = CancellationReasonMapper::toCustomerFacingMessage($reason);
+            $enquiry->user->notify(new EnquiryCancelledNotification(
+                enquiryId: $enquiry->id,
+                enquiryUlid: $enquiry->public_id,
+                safeReason: $safeReason,
+            ));
+        }
 
         return $enquiry;
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domains\Governance\Services\AuditLogger;
+use App\Domains\Notifications\Notifications\AccountSecurityNotification;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Admin\UpdateUserStatusRequest;
 use App\Http\Resources\Api\V1\Admin\AdminUserResource;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 final class AdminUserController extends Controller
 {
@@ -101,6 +103,22 @@ final class AdminUserController extends Controller
             actorRole: 'super_admin'
         );
 
+        if ($oldStatus !== $newStatus) {
+            $title = $newStatus === 'suspended' ? 'Account Suspended' : 'Account Reactivated';
+            $msg = $newStatus === 'suspended'
+                ? 'Your account has been suspended by platform administration. Please contact support.'
+                : 'Your account has been reactivated. You now have full platform access.';
+
+            $user->notify(new AccountSecurityNotification(
+                eventType: 'status_updated',
+                title: $title,
+                message: $msg,
+                uniqueEventId: 'status_'.$newStatus.'_'.now()->timestamp,
+                actionUrl: '/dashboard/settings',
+                extraMetadata: ['status' => $newStatus]
+            ));
+        }
+
         $user->load('roles');
 
         return ApiResponse::success(
@@ -127,6 +145,15 @@ final class AdminUserController extends Controller
             newValues: ['revoked_by_admin_id' => $request->user()->id],
             actorRole: 'super_admin'
         );
+
+        $user->notify(new AccountSecurityNotification(
+            eventType: 'session_revocation',
+            title: 'Active Sessions Revoked',
+            message: 'An administrator or security protocol has revoked all active sessions for your account.',
+            uniqueEventId: 'revoke_'.now()->timestamp.'_'.Str::random(6),
+            actionUrl: '/dashboard/settings',
+            extraMetadata: ['revoked_by_admin' => true]
+        ));
 
         return ApiResponse::success([], [
             'message' => 'All active Sanctum tokens and sessions for this user have been revoked.',

@@ -17,6 +17,7 @@ use App\Domains\Leads\Enums\EnquiryStatus;
 use App\Domains\Leads\Enums\LeadStatus;
 use App\Domains\Leads\Models\Enquiry;
 use App\Domains\Leads\Models\EnquiryRecipient;
+use App\Domains\Notifications\Notifications\ReviewReplyReceivedNotification;
 use App\Domains\Reviews\Enums\ReviewModerationStatus;
 use App\Domains\Reviews\Enums\ReviewStatus;
 use App\Domains\Reviews\Enums\ReviewTrustBadge;
@@ -371,10 +372,28 @@ final class ReviewManagementService
             );
         }
 
+        $isInitialReply = $review->owner_replied_at === null && empty($review->owner_reply_text);
+
         $review->owner_reply_text = trim($replyText);
         $review->owner_replied_at = now();
         $review->owner_reply_user_id = $actor->id;
         $review->save();
+
+        if ($isInitialReply && $review->user_id !== null) {
+            $review->loadMissing('user');
+            if ($review->user !== null) {
+                $citySlug = $business->city?->slug ?? 'chennai';
+                $review->user->notify(new ReviewReplyReceivedNotification(
+                    reviewId: $review->id,
+                    reviewUlid: $review->public_id,
+                    businessName: $business->name,
+                    businessSlug: $business->slug,
+                    citySlug: $citySlug,
+                    replyText: $review->owner_reply_text,
+                    replyVersion: 'initial'
+                ));
+            }
+        }
 
         $citySlug = $business->city?->slug ?? 'chennai';
         DispatchRevalidationWebhookJob::dispatch([

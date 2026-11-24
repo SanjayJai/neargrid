@@ -9,6 +9,7 @@ use App\Domains\Identity\Models\OtpChallenge;
 use App\Domains\Identity\Models\PersonalAccessToken;
 use App\Domains\Identity\Models\Role;
 use App\Domains\Identity\Models\UserDevice;
+use App\Domains\Notifications\Notifications\AccountSecurityNotification;
 use App\Models\User;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
@@ -142,7 +143,7 @@ final class AuthTokenService
         ?string $fcmToken = null,
         ?string $appVersion = null,
     ): UserDevice {
-        return UserDevice::query()->updateOrCreate(
+        $device = UserDevice::query()->updateOrCreate(
             [
                 'user_id' => $user->id,
                 'device_identifier' => $deviceIdentifier,
@@ -154,6 +155,22 @@ final class AuthTokenService
                 'last_active_at' => now(),
             ]
         );
+
+        if ($device->wasRecentlyCreated) {
+            $user->notify(new AccountSecurityNotification(
+                eventType: 'new_device',
+                title: 'New Device Recognized',
+                message: "A new {$device->platform} device was linked to your account.",
+                uniqueEventId: (string) $device->public_id,
+                actionUrl: '/dashboard/settings',
+                extraMetadata: [
+                    'device_id' => (string) $device->public_id,
+                    'platform' => $device->platform,
+                ]
+            ));
+        }
+
+        return $device;
     }
 
     public function revokeDeviceAndTokens(UserDevice $device): int
