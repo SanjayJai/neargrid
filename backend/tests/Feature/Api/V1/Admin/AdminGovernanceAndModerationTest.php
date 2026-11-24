@@ -14,6 +14,9 @@ use App\Domains\Identity\Models\Role;
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use App\Domains\Media\Models\KycDocument;
+use App\Domains\Reviews\Enums\ReviewModerationStatus;
+use App\Domains\Reviews\Enums\ReviewStatus;
+use App\Domains\Reviews\Models\Review;
 use App\Domains\Taxonomy\Models\Category;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -21,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 final class AdminGovernanceAndModerationTest extends TestCase
@@ -146,6 +150,20 @@ final class AdminGovernanceAndModerationTest extends TestCase
 
         $downloadUrl = (string) $signedRes->json('data.download_url');
         $this->assertStringContainsString('signature=', $downloadUrl);
+
+        Storage::fake('kyc_private');
+        Storage::disk('kyc_private')->put('kyc/test-doc.pdf', 'secret test kyc content');
+
+        // KYC verifier can successfully download using actor-bound signed link
+        $downloadRes = $this->withHeaders($headers)->get($downloadUrl);
+        $downloadRes->assertOk();
+        $this->assertSame('secret test kyc content', $downloadRes->getContent());
+
+        // A different user cannot download using this actor-bound link
+        $this->flushHeaders();
+        auth()->forgetGuards();
+        $otherToken = $this->regularCustomer->createToken('other-cust')->plainTextToken;
+        $this->withHeader('Authorization', "Bearer {$otherToken}")->get($downloadUrl)->assertForbidden();
     }
 
     public function test_kyc_verifier_approves_verification_and_awards_verified_and_trust_badges(): void
@@ -302,6 +320,81 @@ final class AdminGovernanceAndModerationTest extends TestCase
 
             return hash_equals($expectedHash, $hash)
                 && $request->data()['paths'] === $paths;
+        });
+    }
+
+    public function test_moderator_role_can_view_and_moderate_reviews(): void
+    {
+        $review = Review::query()->create([
+            'business_id' => $this->business->id,
+            'user_id' => $this->regularCustomer->id,
+            'customer_name' => 'Anita Raman',
+            'phone_e164' => '+919840112233',
+            'rating' => 1,
+            'title' => 'Flagged Content',
+            'content' => 'Review containing unverified promotional claims.',
+            'status' => ReviewStatus::Published,
+            'moderation_status' => ReviewModerationStatus::Pending,
+            'ip_address_hash' => hash('sha256', '127.0.0.1'),
+        ]);
+
+        $token = $this->moderator->createToken('mod-token')->plainTextToken;
+        $headers = ['Authorization' => "Bearer {$token}"];
+
+        // 1. Moderator can list admin reviews
+        $listRes = $this->withHeaders($headers)->getJson('/api/v1/admin/reviews');
+        $listRes->assertOk()
+            ->assertJsonPath('data.0.public_id', $review->public_id);
+
+        // 2. Moderator can moderate review
+        $modRes = $this->withHeaders($headers)
+            ->patchJson("/api/v1/admin/reviews/{$review->public_id}/moderation", [
+                'status' => 'hidden',
+                'reason' => 'Violation of platform content standards.',
+            ]);
+
+        $modRes->assertOk()
+            ->assertJsonPath('data.moderation_status', 'hidden')
+            ->assertJsonPath('data.status', 'hidden');
+
+        $review->refresh();
+        $this->assertSame(ReviewModerationStatus::Hidden, $review->moderation_status);
+        $this->assertSame(ReviewStatus::Hidden, $review->status);
+    }
+
+    public function test_services_media_and_directory_changes_dispatch_revalidation_webhook(): void
+    {
+        Queue::fake([DispatchRevalidationWebhookJob::class]);
+
+        $owner = User::query()->findOrFail($this->business->owner_user_id);
+        $ownerToken = $owner->createToken('owner-token')->plainTextToken;
+        $headers = ['Authorization' => "Bearer {$ownerToken}"];
+
+        // 1. Owner creates service -> dispatches revalidation
+        $this->withHeaders($headers)->postJson("/api/v1/owner/businesses/{$this->business->public_id}/services", [
+            'name' => 'Root Canal Treatment',
+            'description' => 'Comprehensive endodontic treatment',
+            'price_min_minor' => 250000,
+            'currency' => 'INR',
+        ])->assertCreated();
+
+        Queue::assertPushed(DispatchRevalidationWebhookJob::class, function (DispatchRevalidationWebhookJob $job) {
+            return in_array("/{$this->city->slug}/business/{$this->business->slug}", $job->paths, true)
+                && $job->reason === 'business_service_created';
+        });
+
+        // 2. Profile update -> dispatches revalidation for storefront AND directory listings
+        $this->withHeaders($headers)->putJson("/api/v1/owner/businesses/{$this->business->public_id}", [
+            'name' => 'Metro Smile Super Dental Care',
+            'address_line_1' => '102 Mount Road',
+            'pincode' => '600017',
+        ])->assertOk();
+
+        Queue::assertPushed(DispatchRevalidationWebhookJob::class, function (DispatchRevalidationWebhookJob $job) {
+            return in_array("/{$this->city->slug}/business/{$this->business->slug}", $job->paths, true)
+                && in_array("/{$this->city->slug}", $job->paths, true)
+                && in_array("/{$this->city->slug}/{$this->category->slug}", $job->paths, true)
+                && $job->reason === 'business_profile_updated';
         });
     }
 }

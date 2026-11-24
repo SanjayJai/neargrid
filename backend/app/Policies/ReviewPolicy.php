@@ -20,11 +20,16 @@ final class ReviewPolicy
 
     public function viewAdmin(User $actor): bool
     {
-        return $actor->hasRole('super_admin') || $actor->hasRole('support');
+        return $actor->hasRole('super_admin')
+            || $actor->hasRole('support')
+            || $actor->hasRole('moderator')
+            || $actor->hasPermission('reviews.moderate');
     }
 
     public function moderateAdmin(User $actor, Review $review): bool
     {
-        return $actor->hasRole('super_admin');
+        return $actor->hasRole('super_admin')
+            || $actor->hasRole('moderator')
+            || $actor->hasPermission('reviews.moderate');
     }
 }

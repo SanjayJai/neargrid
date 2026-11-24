@@ -86,9 +86,12 @@ final class OwnerBusinessController extends Controller
 
         $citySlug = $updated->city?->slug ?? 'chennai';
         if ($updated->slug) {
-            DispatchRevalidationWebhookJob::dispatch([
-                "/{$citySlug}/business/{$updated->slug}",
-            ], 'business_profile_updated')->afterCommit();
+            $paths = ["/{$citySlug}/business/{$updated->slug}", "/{$citySlug}"];
+            $categorySlug = $updated->primaryCategory?->slug;
+            if ($categorySlug) {
+                $paths[] = "/{$citySlug}/{$categorySlug}";
+            }
+            DispatchRevalidationWebhookJob::dispatch($paths, 'business_profile_updated')->afterCommit();
         }
 
         return ApiResponse::success((new OwnerBusinessResource($updated))->resolve($request));
@@ -147,6 +150,13 @@ final class OwnerBusinessController extends Controller
         $business->completeness_score = $this->completeness->calculate($business);
         $business->save();
 
+        $citySlug = $business->city?->slug ?? 'chennai';
+        if ($business->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$business->slug}",
+            ], 'business_service_created')->afterCommit();
+        }
+
         return ApiResponse::created((new BusinessServiceResource($service))->resolve($request));
     }
 
@@ -172,6 +182,13 @@ final class OwnerBusinessController extends Controller
         ]);
         $service->save();
 
+        $citySlug = $business->city?->slug ?? 'chennai';
+        if ($business->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$business->slug}",
+            ], 'business_service_updated')->afterCommit();
+        }
+
         return ApiResponse::success((new BusinessServiceResource($service))->resolve($request));
     }
 
@@ -187,6 +204,13 @@ final class OwnerBusinessController extends Controller
         $service->delete();
         $business->completeness_score = $this->completeness->calculate($business);
         $business->save();
+
+        $citySlug = $business->city?->slug ?? 'chennai';
+        if ($business->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$business->slug}",
+            ], 'business_service_deleted')->afterCommit();
+        }
 
         return ApiResponse::noContent();
     }

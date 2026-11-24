@@ -130,9 +130,12 @@ final class BusinessVerificationAndClaimService
 
             $citySlug = $business->city?->slug ?? 'chennai';
             if ($business->slug) {
-                DispatchRevalidationWebhookJob::dispatch([
-                    "/{$citySlug}/business/{$business->slug}",
-                ], 'kyc_verification')->afterCommit();
+                $paths = ["/{$citySlug}/business/{$business->slug}", "/{$citySlug}"];
+                $categorySlug = $business->primaryCategory?->slug;
+                if ($categorySlug) {
+                    $paths[] = "/{$citySlug}/{$categorySlug}";
+                }
+                DispatchRevalidationWebhookJob::dispatch($paths, 'kyc_verification')->afterCommit();
             }
 
             return $verification->refresh();

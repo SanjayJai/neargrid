@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Media;
 
+use App\Domains\Directory\Jobs\DispatchRevalidationWebhookJob;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Media\Enums\BusinessMediaType;
 use App\Domains\Media\Enums\MediaUploadStatus;
@@ -60,6 +61,13 @@ final class BusinessMediaController extends Controller
             ? Response::HTTP_CREATED
             : Response::HTTP_ACCEPTED;
 
+        $citySlug = $business->city?->slug ?? 'chennai';
+        if ($business->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$business->slug}",
+            ], 'business_media_uploaded')->afterCommit();
+        }
+
         return ApiResponse::success(
             data: (new BusinessMediaResource($media))->resolve($request),
             status: $status,
@@ -73,6 +81,13 @@ final class BusinessMediaController extends Controller
         Gate::forUser($user)->authorize('delete', [$media, $business]);
 
         $this->mediaService->deletePublicMedia($user, $business, $media);
+
+        $citySlug = $business->city?->slug ?? 'chennai';
+        if ($business->slug) {
+            DispatchRevalidationWebhookJob::dispatch([
+                "/{$citySlug}/business/{$business->slug}",
+            ], 'business_media_deleted')->afterCommit();
+        }
 
         return ApiResponse::success(['deleted' => true]);
     }

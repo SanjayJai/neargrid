@@ -231,9 +231,12 @@ final class ReviewManagementService
             $this->recalculateBusinessRating($business);
 
             $citySlug = $business->city?->slug ?? 'chennai';
-            DispatchRevalidationWebhookJob::dispatch([
-                "/{$citySlug}/business/{$business->slug}",
-            ], 'review_published')->afterCommit();
+            $paths = ["/{$citySlug}/business/{$business->slug}", "/{$citySlug}"];
+            $categorySlug = $business->primaryCategory?->slug;
+            if ($categorySlug) {
+                $paths[] = "/{$citySlug}/{$categorySlug}";
+            }
+            DispatchRevalidationWebhookJob::dispatch($paths, 'review_published')->afterCommit();
 
             return [
                 'review' => $review,
@@ -322,9 +325,12 @@ final class ReviewManagementService
         $business = $review->business;
         $citySlug = $business?->city?->slug ?? 'chennai';
         if ($business?->slug) {
-            DispatchRevalidationWebhookJob::dispatch([
-                "/{$citySlug}/business/{$business->slug}",
-            ], 'guest_review_verified')->afterCommit();
+            $paths = ["/{$citySlug}/business/{$business->slug}", "/{$citySlug}"];
+            $categorySlug = $business->primaryCategory?->slug;
+            if ($categorySlug) {
+                $paths[] = "/{$citySlug}/{$categorySlug}";
+            }
+            DispatchRevalidationWebhookJob::dispatch($paths, 'guest_review_verified')->afterCommit();
         }
 
         return $review;
@@ -482,9 +488,12 @@ final class ReviewManagementService
         $business = $review->business;
         $citySlug = $business?->city?->slug ?? 'chennai';
         if ($business?->slug) {
-            DispatchRevalidationWebhookJob::dispatch([
-                "/{$citySlug}/business/{$business->slug}",
-            ], 'review_moderation')->afterCommit();
+            $paths = ["/{$citySlug}/business/{$business->slug}", "/{$citySlug}"];
+            $categorySlug = $business->primaryCategory?->slug;
+            if ($categorySlug) {
+                $paths[] = "/{$citySlug}/{$categorySlug}";
+            }
+            DispatchRevalidationWebhookJob::dispatch($paths, 'review_moderation')->afterCommit();
         }
 
         return $review;
