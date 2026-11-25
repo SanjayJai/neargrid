@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import {
   fetchPublicCategories,
   fetchPublicCities,
@@ -8,6 +8,7 @@ import {
   fetchPublicSearchFilters,
 } from '@/lib/api/public-directory';
 import { CanonicalDirectoryView } from '@/modules/customer/components/CanonicalDirectoryView';
+import { isSafeInternalRedirectPath } from '@/modules/customer/lib/business-profile';
 import {
   buildOrganicItemListJsonLd,
   evaluateCanonicalDirectorySeo,
@@ -63,6 +64,12 @@ export async function generateMetadata({
     fetchPublicCategories(parsed.locale),
     fetchPublicLocalities(citySlug, parsed.locale),
   ]);
+
+  if (searchRes.status === 301) {
+    return {
+      robots: { index: false, follow: false },
+    };
+  }
 
   const cityName =
     citiesRes.data?.find((c) => c.slug === citySlug)?.name ??
@@ -133,6 +140,10 @@ export default async function CityLocalityCategoryPage({
     fetchPublicCategories(parsedParams.locale),
     fetchPublicLocalities(citySlug, parsedParams.locale),
   ]);
+
+  if (searchRes.status === 301 && isSafeInternalRedirectPath(searchRes.redirectTargetPath)) {
+    permanentRedirect(searchRes.redirectTargetPath);
+  }
 
   const hits = searchRes.ok && searchRes.data ? searchRes.data : [];
   const meta = searchRes.ok && searchRes.meta ? searchRes.meta : null;

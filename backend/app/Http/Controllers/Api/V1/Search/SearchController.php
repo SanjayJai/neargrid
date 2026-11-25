@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Search;
 
+use App\Domains\Location\Services\LocationRedirectResolver;
 use App\Domains\Search\Contracts\SearchEngineInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Search\NearbySearchRequest;
@@ -19,11 +20,29 @@ final class SearchController extends Controller
 {
     public function __construct(
         private readonly SearchEngineInterface $searchEngine,
+        private readonly LocationRedirectResolver $locationRedirectResolver,
     ) {}
 
     public function search(SearchBusinessesRequest $request): JsonResponse
     {
         $query = $request->toSearchQuery(isNearbyMode: false);
+        $singleLocality = count($query->localitySlugs) === 1 ? $query->localitySlugs[0] : null;
+        $redirectTarget = $this->locationRedirectResolver->resolveDirectoryRedirect(
+            citySlug: $query->citySlug,
+            localitySlug: $singleLocality,
+            categorySlug: $query->categorySlug,
+        );
+
+        if ($redirectTarget !== null) {
+            return ApiResponse::error(
+                code: 'MOVED_PERMANENTLY',
+                message: 'This directory location has moved to a new URL.',
+                status: Response::HTTP_MOVED_PERMANENTLY,
+                details: ['target_path' => $redirectTarget],
+                headers: ['Location' => $redirectTarget],
+            );
+        }
+
         $result = $this->searchEngine->search($query);
 
         $items = SearchBusinessHitResource::collection($result->hits)->resolve($request);

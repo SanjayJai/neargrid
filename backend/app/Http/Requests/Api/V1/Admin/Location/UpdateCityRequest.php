@@ -36,6 +36,8 @@ final class UpdateCityRequest extends FormRequest
             'translations.*.name' => ['required', 'string', 'max:120'],
             'translations.*.seo_title' => ['sometimes', 'nullable', 'string', 'max:160'],
             'translations.*.seo_description' => ['sometimes', 'nullable', 'string', 'max:320'],
+            'remove_locales' => ['sometimes', 'array'],
+            'remove_locales.*' => ['required', 'string', 'max:10'],
         ];
     }
 }

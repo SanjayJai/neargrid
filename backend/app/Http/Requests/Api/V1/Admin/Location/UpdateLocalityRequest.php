@@ -32,6 +32,8 @@ final class UpdateLocalityRequest extends FormRequest
             'translations' => ['sometimes', 'array'],
             'translations.*.locale' => ['required', 'string', 'max:10'],
             'translations.*.name' => ['required', 'string', 'max:140'],
+            'remove_locales' => ['sometimes', 'array'],
+            'remove_locales.*' => ['required', 'string', 'max:10'],
         ];
     }
 }

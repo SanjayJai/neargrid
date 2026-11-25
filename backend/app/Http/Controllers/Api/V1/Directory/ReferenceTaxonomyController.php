@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Directory;
 
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\State;
+use App\Domains\Location\Services\LocationRedirectResolver;
 use App\Domains\Taxonomy\Models\Amenity;
 use App\Domains\Taxonomy\Models\Category;
 use App\Domains\Taxonomy\Models\PaymentMethod;
@@ -17,6 +18,10 @@ use Illuminate\Http\Response;
 
 final class ReferenceTaxonomyController extends Controller
 {
+    public function __construct(
+        private readonly LocationRedirectResolver $locationRedirectResolver,
+    ) {}
+
     public function states(Request $request): JsonResponse
     {
         $locale = $this->normalizeLocale((string) $request->query('locale', 'en'));
@@ -126,6 +131,20 @@ final class ReferenceTaxonomyController extends Controller
             ->first();
 
         if ($city === null) {
+            $redirectTarget = $this->locationRedirectResolver->resolveDirectoryRedirect($citySlug);
+            if ($redirectTarget !== null) {
+                $newSlug = ltrim($redirectTarget, '/');
+                $apiTarget = "/api/v1/locations/cities/{$newSlug}/localities";
+
+                return ApiResponse::error(
+                    code: 'MOVED_PERMANENTLY',
+                    message: 'This city has moved to a new slug.',
+                    status: Response::HTTP_MOVED_PERMANENTLY,
+                    details: ['target_path' => $apiTarget],
+                    headers: ['Location' => $apiTarget],
+                );
+            }
+
             return ApiResponse::error('NOT_FOUND', 'City not found.', Response::HTTP_NOT_FOUND);
         }
 

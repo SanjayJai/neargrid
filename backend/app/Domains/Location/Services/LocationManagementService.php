@@ -26,6 +26,7 @@ final class LocationManagementService
 
     public function __construct(
         private readonly AuditLogger $auditLogger,
+        private readonly LocationRedirectResolver $redirectResolver,
     ) {}
 
     /**
@@ -107,6 +108,7 @@ final class LocationManagementService
             ]);
 
             $this->syncStateTranslations($state, $translations);
+            $afterTranslations = $this->snapshotSimpleTranslations($state);
 
             $this->auditLogger->record(
                 actor: $actor,
@@ -119,6 +121,7 @@ final class LocationManagementService
                     'name' => $state->name,
                     'slug' => $state->slug,
                     'is_active' => $state->is_active,
+                    'translations' => $afterTranslations,
                 ],
                 actorRole: 'super_admin'
             );
@@ -135,8 +138,9 @@ final class LocationManagementService
         $translations = array_key_exists('translations', $data)
             ? $this->prepareTranslations($data['translations'], null)
             : null;
+        $removeLocales = $this->prepareRemoveLocales($data['remove_locales'] ?? null);
 
-        return DB::transaction(function () use ($actor, $state, $data, $translations): State {
+        return DB::transaction(function () use ($actor, $state, $data, $translations, $removeLocales): State {
             $oldValues = [
                 'country_code' => $state->country_code,
                 'name' => $state->name,
@@ -144,6 +148,7 @@ final class LocationManagementService
                 'sort_order' => $state->sort_order,
                 'is_active' => $state->is_active,
             ];
+            $beforeTranslations = $this->snapshotSimpleTranslations($state);
 
             $countryCode = isset($data['country_code'])
                 ? strtoupper(trim((string) $data['country_code']))
@@ -193,19 +198,34 @@ final class LocationManagementService
             if ($translations !== null) {
                 $this->syncStateTranslations($state, $translations);
             }
+            if ($removeLocales !== []) {
+                StateTranslation::query()
+                    ->where('state_id', $state->id)
+                    ->whereIn('locale', $removeLocales)
+                    ->delete();
+            }
+
+            $newValues = [
+                'country_code' => $state->country_code,
+                'name' => $state->name,
+                'slug' => $state->slug,
+                'sort_order' => $state->sort_order,
+                'is_active' => $state->is_active,
+            ];
+
+            $afterTranslations = $this->snapshotSimpleTranslations($state);
+            $translationDiff = $this->diffTranslationSnapshots($beforeTranslations, $afterTranslations);
+            if ($translationDiff !== null) {
+                $oldValues['translations'] = $translationDiff['old'];
+                $newValues['translations'] = $translationDiff['new'];
+            }
 
             $this->auditLogger->record(
                 actor: $actor,
                 action: 'location.state.updated',
                 auditable: $state,
                 oldValues: $oldValues,
-                newValues: [
-                    'country_code' => $state->country_code,
-                    'name' => $state->name,
-                    'slug' => $state->slug,
-                    'sort_order' => $state->sort_order,
-                    'is_active' => $state->is_active,
-                ],
+                newValues: $newValues,
                 actorRole: 'super_admin'
             );
 
@@ -311,6 +331,7 @@ final class LocationManagementService
             ]);
 
             $this->syncCityTranslations($city, $translations);
+            $afterTranslations = $this->snapshotCityTranslations($city);
 
             $this->auditLogger->record(
                 actor: $actor,
@@ -324,6 +345,7 @@ final class LocationManagementService
                     'slug' => $city->slug,
                     'latitude' => $lat,
                     'longitude' => $lng,
+                    'translations' => $afterTranslations,
                 ],
                 actorRole: 'super_admin'
             );
@@ -340,8 +362,9 @@ final class LocationManagementService
         $translations = array_key_exists('translations', $data)
             ? $this->prepareTranslations($data['translations'], null)
             : null;
+        $removeLocales = $this->prepareRemoveLocales($data['remove_locales'] ?? null);
 
-        return DB::transaction(function () use ($actor, $city, $data, $translations): City {
+        return DB::transaction(function () use ($actor, $city, $data, $translations, $removeLocales): City {
             $oldSlug = $city->slug;
             $oldValues = [
                 'state_id' => $city->state_id,
@@ -353,6 +376,7 @@ final class LocationManagementService
                 'sort_order' => $city->sort_order,
                 'is_active' => $city->is_active,
             ];
+            $beforeTranslations = $this->snapshotCityTranslations($city);
 
             $targetStateId = $city->state_id;
             if (isset($data['state_public_id']) || isset($data['state_slug'])) {
@@ -415,22 +439,37 @@ final class LocationManagementService
             if ($translations !== null) {
                 $this->syncCityTranslations($city, $translations);
             }
+            if ($removeLocales !== []) {
+                CityTranslation::query()
+                    ->where('city_id', $city->id)
+                    ->whereIn('locale', $removeLocales)
+                    ->delete();
+            }
+
+            $newValues = [
+                'state_id' => $city->state_id,
+                'name' => $city->name,
+                'slug' => $city->slug,
+                'latitude' => $lat,
+                'longitude' => $lng,
+                'is_popular' => $city->is_popular,
+                'sort_order' => $city->sort_order,
+                'is_active' => $city->is_active,
+            ];
+
+            $afterTranslations = $this->snapshotCityTranslations($city);
+            $translationDiff = $this->diffTranslationSnapshots($beforeTranslations, $afterTranslations);
+            if ($translationDiff !== null) {
+                $oldValues['translations'] = $translationDiff['old'];
+                $newValues['translations'] = $translationDiff['new'];
+            }
 
             $this->auditLogger->record(
                 actor: $actor,
                 action: 'location.city.updated',
                 auditable: $city,
                 oldValues: $oldValues,
-                newValues: [
-                    'state_id' => $city->state_id,
-                    'name' => $city->name,
-                    'slug' => $city->slug,
-                    'latitude' => $lat,
-                    'longitude' => $lng,
-                    'is_popular' => $city->is_popular,
-                    'sort_order' => $city->sort_order,
-                    'is_active' => $city->is_active,
-                ],
+                newValues: $newValues,
                 actorRole: 'super_admin'
             );
 
@@ -539,6 +578,7 @@ final class LocationManagementService
             ]);
 
             $this->syncLocalityTranslations($locality, $translations);
+            $afterTranslations = $this->snapshotSimpleTranslations($locality);
 
             $this->auditLogger->record(
                 actor: $actor,
@@ -552,6 +592,7 @@ final class LocationManagementService
                     'slug' => $locality->slug,
                     'latitude' => $lat,
                     'longitude' => $lng,
+                    'translations' => $afterTranslations,
                 ],
                 actorRole: 'super_admin'
             );
@@ -568,8 +609,9 @@ final class LocationManagementService
         $translations = array_key_exists('translations', $data)
             ? $this->prepareTranslations($data['translations'], null)
             : null;
+        $removeLocales = $this->prepareRemoveLocales($data['remove_locales'] ?? null);
 
-        return DB::transaction(function () use ($actor, $locality, $data, $translations): Locality {
+        return DB::transaction(function () use ($actor, $locality, $data, $translations, $removeLocales): Locality {
             $locality->loadMissing('city');
             $oldSlug = $locality->slug;
             $oldValues = [
@@ -583,6 +625,7 @@ final class LocationManagementService
                 'sort_order' => $locality->sort_order,
                 'is_active' => $locality->is_active,
             ];
+            $beforeTranslations = $this->snapshotSimpleTranslations($locality);
 
             $targetCityId = $locality->city_id;
             $targetCitySlug = $locality->city->slug;
@@ -639,14 +682,36 @@ final class LocationManagementService
             $locality->save();
 
             if ($oldSlug !== $locality->slug) {
-                UrlRedirect::query()->updateOrCreate(
-                    ['source_path' => "/{$targetCitySlug}/{$oldSlug}"],
-                    ['target_path' => "/{$targetCitySlug}/{$locality->slug}", 'http_status' => 301]
-                );
+                $this->upsertSafeRedirect("/{$targetCitySlug}/{$oldSlug}", "/{$targetCitySlug}/{$locality->slug}");
             }
 
             if ($translations !== null) {
                 $this->syncLocalityTranslations($locality, $translations);
+            }
+            if ($removeLocales !== []) {
+                LocalityTranslation::query()
+                    ->where('locality_id', $locality->id)
+                    ->whereIn('locale', $removeLocales)
+                    ->delete();
+            }
+
+            $newValues = [
+                'city_id' => $locality->city_id,
+                'name' => $locality->name,
+                'slug' => $locality->slug,
+                'pincode' => $locality->pincode,
+                'latitude' => $lat,
+                'longitude' => $lng,
+                'is_popular' => $locality->is_popular,
+                'sort_order' => $locality->sort_order,
+                'is_active' => $locality->is_active,
+            ];
+
+            $afterTranslations = $this->snapshotSimpleTranslations($locality);
+            $translationDiff = $this->diffTranslationSnapshots($beforeTranslations, $afterTranslations);
+            if ($translationDiff !== null) {
+                $oldValues['translations'] = $translationDiff['old'];
+                $newValues['translations'] = $translationDiff['new'];
             }
 
             $this->auditLogger->record(
@@ -654,17 +719,7 @@ final class LocationManagementService
                 action: 'location.locality.updated',
                 auditable: $locality,
                 oldValues: $oldValues,
-                newValues: [
-                    'city_id' => $locality->city_id,
-                    'name' => $locality->name,
-                    'slug' => $locality->slug,
-                    'pincode' => $locality->pincode,
-                    'latitude' => $lat,
-                    'longitude' => $lng,
-                    'is_popular' => $locality->is_popular,
-                    'sort_order' => $locality->sort_order,
-                    'is_active' => $locality->is_active,
-                ],
+                newValues: $newValues,
                 actorRole: 'super_admin'
             );
 
@@ -776,6 +831,14 @@ final class LocationManagementService
             );
         }
 
+        if (! $state->is_active) {
+            throw new LocationException(
+                'PARENT_LOCATION_INACTIVE',
+                'Cannot create or move a city under an inactive state.',
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
         return $state;
     }
 
@@ -784,7 +847,7 @@ final class LocationManagementService
      */
     private function resolveCity(array $data): City
     {
-        $query = City::query();
+        $query = City::query()->with('state');
 
         if (! empty($data['city_public_id'])) {
             $city = $query->where('public_id', (string) $data['city_public_id'])->first();
@@ -802,6 +865,14 @@ final class LocationManagementService
             throw new LocationException(
                 'CITY_NOT_FOUND',
                 'The specified parent city was not found.',
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        if (! $city->is_active || ($city->state !== null && ! $city->state->is_active)) {
+            throw new LocationException(
+                'PARENT_LOCATION_INACTIVE',
+                'Cannot create or move a locality under an inactive city or state.',
                 Response::HTTP_UNPROCESSABLE_ENTITY
             );
         }
@@ -864,6 +935,93 @@ final class LocationManagementService
     }
 
     /**
+     * @return list<string>
+     */
+    private function prepareRemoveLocales(mixed $rawRemove): array
+    {
+        if (! is_array($rawRemove)) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($rawRemove as $rawLocale) {
+            $locale = strtolower(trim((string) $rawLocale));
+            if (! in_array($locale, self::SUPPORTED_LOCALES, true)) {
+                throw new LocationException(
+                    'INVALID_LOCALE',
+                    "Unsupported translation locale '{$locale}' in remove_locales.",
+                    Response::HTTP_UNPROCESSABLE_ENTITY
+                );
+            }
+            $clean[] = $locale;
+        }
+
+        return array_values(array_unique($clean));
+    }
+
+    /**
+     * @return array<string, array{name: string}>
+     */
+    private function snapshotSimpleTranslations(State|Locality $model): array
+    {
+        $rows = $model->translations()->orderBy('locale')->get();
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(string) $row->locale] = ['name' => (string) $row->name];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return array<string, array{name: string, seo_title: ?string, seo_description: ?string}>
+     */
+    private function snapshotCityTranslations(City $city): array
+    {
+        $rows = $city->translations()->orderBy('locale')->get();
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(string) $row->locale] = [
+                'name' => (string) $row->name,
+                'seo_title' => $row->seo_title,
+                'seo_description' => $row->seo_description,
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  array<string, array<string, ?string>>  $before
+     * @param  array<string, array<string, ?string>>  $after
+     * @return array{old: array<string, ?array<string, ?string>>, new: array<string, ?array<string, ?string>>}|null
+     */
+    private function diffTranslationSnapshots(array $before, array $after): ?array
+    {
+        $locales = array_values(array_unique([...array_keys($before), ...array_keys($after)]));
+        sort($locales);
+
+        $oldDiff = [];
+        $newDiff = [];
+
+        foreach ($locales as $locale) {
+            $beforeVal = $before[$locale] ?? null;
+            $afterVal = $after[$locale] ?? null;
+
+            if ($beforeVal !== $afterVal) {
+                $oldDiff[$locale] = $beforeVal;
+                $newDiff[$locale] = $afterVal;
+            }
+        }
+
+        if ($oldDiff === [] && $newDiff === []) {
+            return null;
+        }
+
+        return ['old' => $oldDiff, 'new' => $newDiff];
+    }
+
+    /**
      * @param  list<array{locale: string, name: string}>  $translations
      */
     private function syncStateTranslations(State $state, array $translations): void
@@ -908,22 +1066,134 @@ final class LocationManagementService
 
     private function recordCitySlugRedirects(City $city, string $oldSlug, string $newSlug): void
     {
-        UrlRedirect::query()->updateOrCreate(
-            ['source_path' => "/{$oldSlug}"],
-            ['target_path' => "/{$newSlug}", 'http_status' => 301]
-        );
+        $this->upsertSafeRedirect("/{$oldSlug}", "/{$newSlug}");
+
+        // Collapse any pre-existing child redirects pointing under /{oldSlug}/ (e.g., earlier locality/business renames).
+        $prefix = "/{$oldSlug}/";
+        UrlRedirect::query()
+            ->where('target_path', 'like', $prefix.'%')
+            ->lockForUpdate()
+            ->get()
+            ->each(function (UrlRedirect $redirect) use ($prefix, $newSlug): void {
+                $suffix = substr((string) $redirect->target_path, strlen($prefix));
+                $collapsedTarget = "/{$newSlug}/{$suffix}";
+
+                if ($redirect->source_path === $collapsedTarget) {
+                    $redirect->delete();
+
+                    return;
+                }
+
+                $redirect->target_path = $collapsedTarget;
+                $redirect->save();
+            });
+
+        Locality::query()
+            ->where('city_id', $city->id)
+            ->select(['id', 'slug'])
+            ->chunkById(200, function ($localities) use ($oldSlug, $newSlug): void {
+                foreach ($localities as $locality) {
+                    $this->upsertSafeRedirect("/{$oldSlug}/{$locality->slug}", "/{$newSlug}/{$locality->slug}");
+                }
+            });
 
         Business::query()
             ->where('city_id', $city->id)
-            ->published()
+            ->whereNull('deleted_at')
             ->select(['id', 'slug'])
             ->chunkById(200, function ($businesses) use ($oldSlug, $newSlug): void {
                 foreach ($businesses as $business) {
-                    UrlRedirect::query()->updateOrCreate(
-                        ['source_path' => "/{$oldSlug}/business/{$business->slug}"],
-                        ['target_path' => "/{$newSlug}/business/{$business->slug}", 'http_status' => 301]
+                    $this->upsertSafeRedirect(
+                        "/{$oldSlug}/business/{$business->slug}",
+                        "/{$newSlug}/business/{$business->slug}"
                     );
                 }
             });
+    }
+
+    /**
+     * Safely record a 301 redirect inside the active transaction without overwriting unrelated sources,
+     * collapsing multi-hop chains (A -> B and B -> C => A -> C), and preventing loops.
+     */
+    private function upsertSafeRedirect(string $sourcePath, string $targetPath): void
+    {
+        if (! $this->redirectResolver->isSafeInternalPath($sourcePath) || ! $this->redirectResolver->isSafeInternalPath($targetPath)) {
+            throw new LocationException(
+                'INVALID_REDIRECT_PATH',
+                'Redirect source and target paths must be safe internal relative paths.',
+                Response::HTTP_UNPROCESSABLE_ENTITY
+            );
+        }
+
+        if ($sourcePath === $targetPath) {
+            return;
+        }
+
+        $existingSource = UrlRedirect::query()
+            ->where('source_path', $sourcePath)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existingSource !== null) {
+            if ($existingSource->target_path === $targetPath) {
+                return;
+            }
+
+            throw new LocationException(
+                'REDIRECT_SOURCE_CONFLICT',
+                "A redirect already exists for source path '{$sourcePath}'.",
+                Response::HTTP_CONFLICT,
+                [
+                    'source_path' => $sourcePath,
+                    'existing_target_path' => $existingSource->target_path,
+                    'requested_target_path' => $targetPath,
+                ]
+            );
+        }
+
+        // Prevent A <-> B inverse loops or conflicting target overrides.
+        $existingAtTarget = UrlRedirect::query()
+            ->where('source_path', $targetPath)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existingAtTarget !== null) {
+            if ($existingAtTarget->target_path === $sourcePath) {
+                // Reverted slug: delete the old inverse redirect so targetPath is live again without looping.
+                $existingAtTarget->delete();
+            } else {
+                throw new LocationException(
+                    'REDIRECT_TARGET_CONFLICT',
+                    "Target path '{$targetPath}' is already redirected to another destination.",
+                    Response::HTTP_CONFLICT,
+                    [
+                        'target_path' => $targetPath,
+                        'existing_target_path' => $existingAtTarget->target_path,
+                    ]
+                );
+            }
+        }
+
+        // Collapse existing chains where prior source paths targeted $sourcePath (A -> B becomes A -> C).
+        UrlRedirect::query()
+            ->where('target_path', $sourcePath)
+            ->lockForUpdate()
+            ->get()
+            ->each(function (UrlRedirect $upstream) use ($targetPath): void {
+                if ($upstream->source_path === $targetPath) {
+                    $upstream->delete();
+
+                    return;
+                }
+
+                $upstream->target_path = $targetPath;
+                $upstream->save();
+            });
+
+        UrlRedirect::query()->create([
+            'source_path' => $sourcePath,
+            'target_path' => $targetPath,
+            'http_status' => 301,
+        ]);
     }
 }
