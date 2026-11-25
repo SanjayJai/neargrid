@@ -49,7 +49,7 @@ return new class extends Migration
             }
 
             // 3. Enforce database-level NOT NULL cleanly per driver without destructive table rebuilds.
-            if ($driver === 'mysql') {
+            if (in_array($driver, ['mysql', 'mariadb'], true)) {
                 DB::statement("ALTER TABLE `{$table}` MODIFY `public_id` CHAR(26) NOT NULL");
             } elseif ($driver === 'sqlite') {
                 DB::statement(
@@ -80,7 +80,7 @@ return new class extends Migration
         $driver = DB::getDriverName();
 
         foreach (self::LOCATION_TABLES as $table) {
-            if ($driver === 'mysql') {
+            if (in_array($driver, ['mysql', 'mariadb'], true)) {
                 DB::statement("ALTER TABLE `{$table}` MODIFY `public_id` CHAR(26) NULL");
             } elseif ($driver === 'sqlite') {
                 DB::statement("DROP TRIGGER IF EXISTS `trg_{$table}_public_id_not_null_ins`");

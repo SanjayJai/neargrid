@@ -7,13 +7,13 @@ namespace Tests\Feature\Database;
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use Database\Seeders\DatabaseSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\TruncatesMysqlDatabase;
 use Tests\TestCase;
 
 final class MySql8SpatialIntegrationTest extends TestCase
 {
-    use RefreshDatabase;
+    use TruncatesMysqlDatabase;
 
     public function test_mysql8_srid_4326_spatial_distance_and_fulltext_indexes(): void
     {

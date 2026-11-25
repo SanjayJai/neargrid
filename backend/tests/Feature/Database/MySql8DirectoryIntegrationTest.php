@@ -9,13 +9,13 @@ use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use App\Domains\Taxonomy\Models\Category;
 use Database\Seeders\DatabaseSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\TruncatesMysqlDatabase;
 use Tests\TestCase;
 
 final class MySql8DirectoryIntegrationTest extends TestCase
 {
-    use RefreshDatabase;
+    use TruncatesMysqlDatabase;
 
     public function test_mysql8_business_location_point_srid_4326_and_fulltext_index(): void
     {

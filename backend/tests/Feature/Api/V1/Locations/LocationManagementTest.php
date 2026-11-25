@@ -517,53 +517,91 @@ final class LocationManagementTest extends TestCase
         $tn = State::query()->where('slug', 'tamil-nadu')->firstOrFail();
         $chennai = City::query()->where('slug', 'chennai')->firstOrFail();
 
-        // Raw SQLite/MySQL insert without public_id on states must fail
-        try {
-            DB::table('states')->insert([
-                'country_code' => 'IN',
-                'name' => 'No ULID State',
-                'slug' => 'no-ulid-state',
-                'sort_order' => 0,
-                'is_active' => true,
-            ]);
-            $this->fail('Expected QueryException when inserting state without public_id.');
-        } catch (QueryException $e) {
-            $this->assertStringContainsString('public_id', $e->getMessage());
+        $driver = DB::getDriverName();
+        $isMysqlFamily = in_array($driver, ['mysql', 'mariadb'], true);
+        $originalSqlMode = null;
+
+        if ($isMysqlFamily) {
+            $schemaName = DB::connection()->getDatabaseName();
+            $nullability = DB::select(
+                "SELECT table_name, is_nullable
+                 FROM information_schema.columns
+                 WHERE table_schema = ?
+                   AND table_name IN ('states', 'cities', 'localities')
+                   AND column_name = 'public_id'",
+                [$schemaName]
+            );
+            $this->assertCount(3, $nullability);
+            foreach ($nullability as $col) {
+                $this->assertSame('NO', $col->is_nullable ?? $col->IS_NULLABLE);
+            }
+
+            $originalSqlMode = (string) DB::selectOne('SELECT @@SESSION.sql_mode AS mode')->mode;
+            if (! str_contains($originalSqlMode, 'STRICT_TRANS_TABLES') && ! str_contains($originalSqlMode, 'STRICT_ALL_TABLES')) {
+                $strictMode = $originalSqlMode === ''
+                    ? 'STRICT_TRANS_TABLES'
+                    : $originalSqlMode.',STRICT_TRANS_TABLES';
+                DB::statement('SET SESSION sql_mode = ?', [$strictMode]);
+            }
         }
 
-        // Raw insert without public_id on cities must fail
         try {
-            DB::table('cities')->insert([
-                'state_id' => $tn->id,
-                'name' => 'No ULID City',
-                'slug' => 'no-ulid-city',
-                'latitude' => 11.0,
-                'longitude' => 77.0,
-                'is_active' => true,
-            ]);
-            $this->fail('Expected QueryException when inserting city without public_id.');
-        } catch (QueryException $e) {
-            $this->assertStringContainsString('public_id', $e->getMessage());
-        }
+            // Raw SQLite/MySQL/MariaDB insert without public_id on states must fail
+            try {
+                DB::table('states')->insert([
+                    'country_code' => 'IN',
+                    'name' => 'No ULID State',
+                    'slug' => 'no-ulid-state',
+                    'sort_order' => 0,
+                    'is_active' => true,
+                ]);
+                $this->fail('Expected QueryException when inserting state without public_id.');
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('public_id', $e->getMessage());
+            }
 
-        // Raw insert without public_id on localities must fail
-        try {
-            DB::table('localities')->insert([
-                'city_id' => $chennai->id,
-                'name' => 'No ULID Locality',
-                'slug' => 'no-ulid-locality',
-                'latitude' => 13.0,
-                'longitude' => 80.2,
-                'is_active' => true,
-            ]);
-            $this->fail('Expected QueryException when inserting locality without public_id.');
-        } catch (QueryException $e) {
-            $this->assertStringContainsString('public_id', $e->getMessage());
-        }
+            // Raw insert without public_id on cities must fail
+            try {
+                DB::table('cities')->insert([
+                    'state_id' => $tn->id,
+                    'name' => 'No ULID City',
+                    'slug' => 'no-ulid-city',
+                    'latitude' => 11.0,
+                    'longitude' => 77.0,
+                    'is_active' => true,
+                ]);
+                $this->fail('Expected QueryException when inserting city without public_id.');
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('public_id', $e->getMessage());
+            }
 
-        // Raw update setting public_id = null must also fail
-        $this->expectException(QueryException::class);
-        DB::table('states')->where('id', $tn->id)->update(['public_id' => null]);
+            // Raw insert without public_id on localities must fail
+            try {
+                DB::table('localities')->insert([
+                    'city_id' => $chennai->id,
+                    'name' => 'No ULID Locality',
+                    'slug' => 'no-ulid-locality',
+                    'latitude' => 13.0,
+                    'longitude' => 80.2,
+                    'is_active' => true,
+                ]);
+                $this->fail('Expected QueryException when inserting locality without public_id.');
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('public_id', $e->getMessage());
+            }
+
+            // Raw update setting public_id = null must also fail
+            try {
+                DB::table('states')->where('id', $tn->id)->update(['public_id' => null]);
+                $this->fail('Expected QueryException when updating state public_id to null.');
+            } catch (QueryException $e) {
+                $this->assertStringContainsString('public_id', $e->getMessage());
+            }
+        } finally {
+            if ($isMysqlFamily && $originalSqlMode !== null) {
+                DB::statement('SET SESSION sql_mode = ?', [$originalSqlMode]);
+            }
+        }
     }
 
     public function test_transaction_rolls_back_on_failure_during_multi_record_mutation(): void

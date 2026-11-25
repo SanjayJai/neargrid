@@ -14,13 +14,13 @@ use App\Domains\Search\DTOs\SearchQuery;
 use App\Domains\Search\Services\GeoSpatialHelper;
 use App\Domains\Taxonomy\Models\Category;
 use Database\Seeders\DatabaseSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Concerns\TruncatesMysqlDatabase;
 use Tests\TestCase;
 
 final class MySql8SearchEngineIntegrationTest extends TestCase
 {
-    use RefreshDatabase;
+    use TruncatesMysqlDatabase;
 
     public function test_mysql8_fulltext_tamil_tanglish_and_spatial_index_execution(): void
     {
