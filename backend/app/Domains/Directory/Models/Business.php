@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Directory\Models;
 
 use App\Domains\Directory\Enums\BusinessStatus;
+use App\Domains\Domains\Models\Domain;
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use App\Domains\Media\Models\BusinessMedia;
@@ -89,6 +90,9 @@ class Business extends Model
     {
         return [
             'status' => BusinessStatus::class,
+            'organization_id' => 'integer',
+            'allow_hq_lead_access' => 'boolean',
+            'canonical_domain_id' => 'integer',
             'latitude' => 'float',
             'longitude' => 'float',
             'year_established' => 'integer',
@@ -112,6 +116,22 @@ class Business extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    /**
+     * @return BelongsTo<Organization, $this>
+     */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class, 'organization_id');
+    }
+
+    /**
+     * @return BelongsTo<Domain, $this>
+     */
+    public function canonicalDomain(): BelongsTo
+    {
+        return $this->belongsTo(Domain::class, 'canonical_domain_id');
     }
 
     /**

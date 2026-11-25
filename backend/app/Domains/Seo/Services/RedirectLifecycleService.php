@@ -19,9 +19,11 @@ final class RedirectLifecycleService
         ?string $entityType = null,
         ?int $entityId = null,
         int $httpStatus = 301,
+        ?int $domainId = null,
     ): UrlRedirect {
         $source = $this->normalizePath($sourcePath);
         $target = $this->normalizePath($targetPath);
+        $scopeKey = UrlRedirect::scopeKeyFor($domainId);
 
         if ($source === $target) {
             throw new SeoException(
@@ -31,21 +33,27 @@ final class RedirectLifecycleService
             );
         }
 
-        return DB::transaction(function () use ($source, $target, $entityType, $entityId, $httpStatus): UrlRedirect {
-            // Collapse existing chains pointing to old sourcePath directly to new targetPath.
+        return DB::transaction(function () use ($source, $target, $entityType, $entityId, $httpStatus, $domainId, $scopeKey): UrlRedirect {
+            // Collapse existing chains pointing to old sourcePath directly to new targetPath within scope.
             UrlRedirect::query()
+                ->where('scope_key', $scopeKey)
                 ->where('target_path', $source)
                 ->update(['target_path' => $target]);
 
-            // Remove any reverse redirect that would create a 2-hop loop.
+            // Remove any reverse redirect that would create a 2-hop loop within scope.
             UrlRedirect::query()
+                ->where('scope_key', $scopeKey)
                 ->where('source_path', $target)
                 ->where('target_path', $source)
                 ->delete();
 
             return UrlRedirect::query()->updateOrCreate(
-                ['source_path' => $source],
                 [
+                    'scope_key' => $scopeKey,
+                    'source_path' => $source,
+                ],
+                [
+                    'domain_id' => $domainId,
                     'target_path' => $target,
                     'http_status' => $httpStatus,
                     'entity_type' => $entityType,
@@ -56,9 +64,10 @@ final class RedirectLifecycleService
         });
     }
 
-    public function resolvePath(string $sourcePath): ?string
+    public function resolvePath(string $sourcePath, ?int $domainId = null): ?string
     {
         $current = $this->normalizePath($sourcePath);
+        $scopeKeys = array_values(array_unique([UrlRedirect::scopeKeyFor($domainId), 'global']));
         $visited = [$current => true];
         $resolved = null;
 
@@ -66,6 +75,8 @@ final class RedirectLifecycleService
             $redirect = UrlRedirect::query()
                 ->where('source_path', $current)
                 ->where('is_active', true)
+                ->whereIn('scope_key', $scopeKeys)
+                ->orderByRaw('CASE WHEN scope_key = ? THEN 0 ELSE 1 END', [UrlRedirect::scopeKeyFor($domainId)])
                 ->first();
 
             if ($redirect === null) {

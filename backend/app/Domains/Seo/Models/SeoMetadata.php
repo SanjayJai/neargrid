@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Seo\Models;
 
+use App\Domains\Domains\Models\Domain;
 use App\Support\Concerns\HasPublicUlid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -76,5 +77,13 @@ class SeoMetadata extends Model
     public function publishedRevision(): BelongsTo
     {
         return $this->belongsTo(SeoRevision::class, 'published_revision_id');
+    }
+
+    /**
+     * @return BelongsTo<Domain, $this>
+     */
+    public function domain(): BelongsTo
+    {
+        return $this->belongsTo(Domain::class, 'domain_id');
     }
 }

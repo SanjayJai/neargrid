@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Leads\Models;
 
 use App\Domains\Directory\Models\Business;
+use App\Domains\Domains\Models\Domain;
 use App\Domains\Leads\Enums\EnquiryStatus;
 use App\Domains\Leads\Enums\EnquiryType;
 use App\Domains\Leads\Enums\EnquiryUrgency;
@@ -69,7 +70,16 @@ class Enquiry extends Model
             'phone_verified_at' => 'datetime',
             'dispatched_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'source_domain_id' => 'integer',
         ];
+    }
+
+    /**
+     * @return BelongsTo<Domain, $this>
+     */
+    public function sourceDomain(): BelongsTo
+    {
+        return $this->belongsTo(Domain::class, 'source_domain_id');
     }
 
     /**
