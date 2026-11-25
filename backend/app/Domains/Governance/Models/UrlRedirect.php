@@ -11,6 +11,9 @@ use Illuminate\Database\Eloquent\Model;
     'source_path',
     'target_path',
     'http_status',
+    'entity_type',
+    'entity_id',
+    'is_active',
 ])]
 class UrlRedirect extends Model
 {
@@ -23,6 +26,8 @@ class UrlRedirect extends Model
     {
         return [
             'http_status' => 'integer',
+            'entity_id' => 'integer',
+            'is_active' => 'boolean',
             'created_at' => 'datetime',
         ];
     }

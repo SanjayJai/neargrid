@@ -51,9 +51,13 @@ final class BusinessManagementService
         $primaryCategory = Category::query()
             ->where('slug', (string) $data['primary_category_slug'])
             ->where('is_active', true)
+            ->where('lifecycle_status', 'published')
             ->first();
         if ($primaryCategory === null) {
             throw new DirectoryException('INVALID_CATEGORY', 'Selected primary category is invalid or inactive.');
+        }
+        if (! $primaryCategory->is_assignable || $primaryCategory->node_type === 'category_group') {
+            throw new DirectoryException('NON_ASSIGNABLE_CATEGORY_NODE', 'Selected category node does not accept direct business assignments.');
         }
 
         $primaryPhone = PhoneNormalizer::normalizeAndValidate((string) $data['primary_phone_e164']);
@@ -187,9 +191,13 @@ final class BusinessManagementService
                 $primary = Category::query()
                     ->where('slug', (string) $data['primary_category_slug'])
                     ->where('is_active', true)
+                    ->where('lifecycle_status', 'published')
                     ->first();
                 if ($primary === null) {
                     throw new DirectoryException('INVALID_CATEGORY', 'Selected primary category is invalid or inactive.');
+                }
+                if (! $primary->is_assignable || $primary->node_type === 'category_group') {
+                    throw new DirectoryException('NON_ASSIGNABLE_CATEGORY_NODE', 'Selected category node does not accept direct business assignments.');
                 }
                 $business->primary_category_id = $primary->id;
             }
@@ -419,16 +427,35 @@ final class BusinessManagementService
     {
         $syncPayload = [$primaryCategoryId => ['is_primary' => true]];
 
-        if ($secondarySlugs !== []) {
-            $secondaryIds = Category::query()
-                ->whereIn('slug', $secondarySlugs)
-                ->where('is_active', true)
-                ->pluck('id')
-                ->all();
+        $cleanSlugs = array_values(array_unique(array_filter(
+            array_map(static fn ($s): string => trim((string) $s), $secondarySlugs),
+            static fn (string $s): bool => $s !== '',
+        )));
 
-            foreach ($secondaryIds as $catId) {
-                if ((int) $catId !== $primaryCategoryId) {
-                    $syncPayload[(int) $catId] = ['is_primary' => false];
+        if ($cleanSlugs !== []) {
+            $categoriesBySlug = Category::query()
+                ->whereIn('slug', $cleanSlugs)
+                ->get()
+                ->keyBy('slug');
+
+            foreach ($cleanSlugs as $slug) {
+                $cat = $categoriesBySlug->get($slug);
+                if ($cat === null || ! $cat->is_active || $cat->lifecycle_status !== 'published') {
+                    throw new DirectoryException(
+                        'INVALID_CATEGORY',
+                        'One or more selected secondary categories are invalid or inactive.',
+                    );
+                }
+
+                if (! $cat->is_assignable || $cat->node_type === 'category_group') {
+                    throw new DirectoryException(
+                        'NON_ASSIGNABLE_CATEGORY_NODE',
+                        'One or more selected secondary category nodes do not accept direct business assignments.',
+                    );
+                }
+
+                if ((int) $cat->id !== $primaryCategoryId) {
+                    $syncPayload[(int) $cat->id] = ['is_primary' => false];
                 }
             }
         }

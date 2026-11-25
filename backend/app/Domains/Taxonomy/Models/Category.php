@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Taxonomy\Models;
 
+use App\Domains\Seo\Concerns\HasSeoMetadata;
 use App\Support\Concerns\HasPublicUlid;
 use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -40,7 +42,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Category extends Model
 {
     /** @use HasFactory<CategoryFactory> */
-    use HasFactory, HasPublicUlid, SoftDeletes;
+    use HasFactory, HasPublicUlid, HasSeoMetadata, SoftDeletes;
 
     protected static function newFactory(): CategoryFactory
     {
@@ -88,6 +90,64 @@ class Category extends Model
     public function translations(): HasMany
     {
         return $this->hasMany(CategoryTranslation::class);
+    }
+
+    /**
+     * @return HasMany<CategoryRevision, $this>
+     */
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(CategoryRevision::class)->orderByDesc('version_number');
+    }
+
+    /**
+     * @return BelongsTo<CategoryRevision, $this>
+     */
+    public function publishedVersion(): BelongsTo
+    {
+        return $this->belongsTo(CategoryRevision::class, 'published_version_id');
+    }
+
+    /**
+     * @return BelongsToMany<CategoryCollection, $this>
+     */
+    public function collections(): BelongsToMany
+    {
+        return $this->belongsToMany(CategoryCollection::class, 'category_collection_items', 'category_id', 'collection_id')
+            ->withPivot('sort_order');
+    }
+
+    /**
+     * @return HasMany<CategoryAttributeDefinition, $this>
+     */
+    public function attributeDefinitions(): HasMany
+    {
+        return $this->hasMany(CategoryAttributeDefinition::class)->orderBy('sort_order');
+    }
+
+    /**
+     * @return HasMany<CategoryFilterConfig, $this>
+     */
+    public function filterConfigs(): HasMany
+    {
+        return $this->hasMany(CategoryFilterConfig::class)->orderBy('sort_order');
+    }
+
+    /**
+     * @return HasMany<CategoryProfileSection, $this>
+     */
+    public function profileSections(): HasMany
+    {
+        return $this->hasMany(CategoryProfileSection::class)->orderBy('sort_order');
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where('lifecycle_status', 'published')->where('is_active', true);
     }
 
     public function translationFor(string $locale, string $fallbackLocale = 'en'): ?CategoryTranslation

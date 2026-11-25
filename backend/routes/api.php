@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Account\SavedBusinessController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
+use App\Http\Controllers\Api\V1\Admin\AdminCategoryCollectionController;
+use App\Http\Controllers\Api\V1\Admin\AdminCategoryController;
 use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
 use App\Http\Controllers\Api\V1\Admin\AdminLocationController;
 use App\Http\Controllers\Api\V1\Admin\AdminReviewController;
+use App\Http\Controllers\Api\V1\Admin\AdminSeoController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\AdminVerificationController;
 use App\Http\Controllers\Api\V1\Auth\AccountController;
@@ -35,6 +38,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::get('/locations/cities', [ReferenceTaxonomyController::class, 'cities'])->name('locations.cities');
     Route::get('/locations/cities/{citySlug}/localities', [ReferenceTaxonomyController::class, 'localities'])->name('locations.localities');
     Route::get('/categories', [ReferenceTaxonomyController::class, 'categories'])->name('categories.index');
+    Route::get('/categories/tree', [ReferenceTaxonomyController::class, 'categoryTree'])->name('categories.tree');
+    Route::get('/categories/landing/{path}', [ReferenceTaxonomyController::class, 'categoryLanding'])
+        ->where('path', '.*')
+        ->name('categories.landing');
     Route::get('/attributes', [ReferenceTaxonomyController::class, 'attributes'])->name('attributes.index');
 
     // Public business profiles (only status=active, privacy-safe resource)
@@ -188,6 +195,37 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                 Route::match(['put', 'patch'], '/localities/{locality}', [AdminLocationController::class, 'updateLocality'])->name('localities.update');
                 Route::post('/localities/{locality}/archive', [AdminLocationController::class, 'archiveLocality'])->name('localities.archive');
                 Route::delete('/localities/{locality}', [AdminLocationController::class, 'destroyLocality'])->name('localities.destroy');
+            });
+
+            // Super Admin Category Engine & Global SEO Management (M-A1)
+            Route::prefix('categories')->name('categories.')->group(function (): void {
+                Route::get('/', [AdminCategoryController::class, 'index'])->name('index');
+                Route::post('/', [AdminCategoryController::class, 'store'])->name('store');
+                Route::post('/reorder', [AdminCategoryController::class, 'reorder'])->name('reorder');
+                Route::get('/{category}', [AdminCategoryController::class, 'show'])->name('show');
+                Route::match(['put', 'patch'], '/{category}', [AdminCategoryController::class, 'update'])->name('update');
+                Route::post('/{category}/move', [AdminCategoryController::class, 'move'])->name('move');
+                Route::post('/{category}/clone', [AdminCategoryController::class, 'clone'])->name('clone');
+                Route::post('/{category}/publish', [AdminCategoryController::class, 'publish'])->name('publish');
+                Route::post('/{category}/archive', [AdminCategoryController::class, 'archive'])->name('archive');
+                Route::post('/{categoryPublicId}/restore', [AdminCategoryController::class, 'restore'])->name('restore');
+                Route::delete('/{category}', [AdminCategoryController::class, 'destroy'])->name('destroy');
+                Route::get('/{category}/dependencies', [AdminCategoryController::class, 'dependencies'])->name('dependencies');
+                Route::put('/{category}/schemas', [AdminCategoryController::class, 'syncSchemas'])->name('schemas.sync');
+                Route::post('/{category}/revisions/{revision}/rollback', [AdminCategoryController::class, 'rollback'])->name('revisions.rollback');
+            });
+
+            Route::prefix('category-collections')->name('category-collections.')->group(function (): void {
+                Route::get('/', [AdminCategoryCollectionController::class, 'index'])->name('index');
+                Route::post('/', [AdminCategoryCollectionController::class, 'store'])->name('store');
+                Route::match(['put', 'patch'], '/{categoryCollection}', [AdminCategoryCollectionController::class, 'update'])->name('update');
+                Route::delete('/{categoryCollection}', [AdminCategoryCollectionController::class, 'destroy'])->name('destroy');
+            });
+
+            Route::prefix('seo')->name('seo.')->group(function (): void {
+                Route::get('/{entityType}/{entityIdentifier}', [AdminSeoController::class, 'show'])->name('show');
+                Route::put('/{entityType}/{entityIdentifier}', [AdminSeoController::class, 'upsert'])->name('upsert');
+                Route::post('/metadata/{seoMetadata}/rollback/{revision}', [AdminSeoController::class, 'rollback'])->name('rollback');
             });
         });
 

@@ -22,6 +22,9 @@ use App\Domains\Media\Models\KycDocument;
 use App\Domains\Notifications\Channels\CustomDatabaseChannel;
 use App\Domains\Search\Contracts\SearchEngineInterface;
 use App\Domains\Search\Engines\MysqlSearchEngine;
+use App\Domains\Seo\Models\SeoMetadata;
+use App\Domains\Taxonomy\Models\Category;
+use App\Domains\Taxonomy\Models\CategoryCollection;
 use App\Models\User;
 use App\Policies\AuditLogPolicy;
 use App\Policies\BusinessMediaPolicy;
@@ -29,6 +32,7 @@ use App\Policies\BusinessMemberPolicy;
 use App\Policies\BusinessPolicy;
 use App\Policies\BusinessServicePolicy;
 use App\Policies\BusinessVerificationPolicy;
+use App\Policies\CategoryPolicy;
 use App\Policies\EnquiryPolicy;
 use App\Policies\KycDocumentPolicy;
 use App\Policies\LocationPolicy;
@@ -92,6 +96,9 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(State::class, LocationPolicy::class);
         Gate::policy(City::class, LocationPolicy::class);
         Gate::policy(Locality::class, LocationPolicy::class);
+        Gate::policy(Category::class, CategoryPolicy::class);
+        Gate::policy(CategoryCollection::class, CategoryPolicy::class);
+        Gate::policy(SeoMetadata::class, CategoryPolicy::class);
 
         RateLimiter::for('search', static function (Request $request): Limit {
             $perMinute = max(10, (int) config('search.rate_limit_per_minute', 120));

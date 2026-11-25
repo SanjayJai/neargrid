@@ -10,6 +10,7 @@ use App\Domains\Location\Services\LocationRedirectResolver;
 use App\Domains\Taxonomy\Models\Amenity;
 use App\Domains\Taxonomy\Models\Category;
 use App\Domains\Taxonomy\Models\PaymentMethod;
+use App\Domains\Taxonomy\Services\CategoryTreeService;
 use App\Http\Controllers\Controller;
 use App\Support\Api\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ final class ReferenceTaxonomyController extends Controller
 {
     public function __construct(
         private readonly LocationRedirectResolver $locationRedirectResolver,
+        private readonly CategoryTreeService $categoryTreeService,
     ) {}
 
     public function states(Request $request): JsonResponse
@@ -216,6 +218,20 @@ final class ReferenceTaxonomyController extends Controller
             ->all();
 
         return ApiResponse::success($roots);
+    }
+
+    public function categoryTree(Request $request): JsonResponse
+    {
+        $locale = $this->normalizeLocale((string) $request->query('locale', 'en'));
+
+        return ApiResponse::success($this->categoryTreeService->getPublishedTree($locale));
+    }
+
+    public function categoryLanding(Request $request, string $path): JsonResponse
+    {
+        $locale = $this->normalizeLocale((string) $request->query('locale', 'en'));
+
+        return ApiResponse::success($this->categoryTreeService->resolveLanding($path, $locale));
     }
 
     public function attributes(): JsonResponse

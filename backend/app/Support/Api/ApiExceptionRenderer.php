@@ -8,6 +8,8 @@ use App\Domains\Directory\Exceptions\DirectoryException;
 use App\Domains\Identity\Exceptions\IdentityException;
 use App\Domains\Location\Exceptions\LocationException;
 use App\Domains\Media\Exceptions\MediaException;
+use App\Domains\Seo\Exceptions\SeoException;
+use App\Domains\Taxonomy\Exceptions\CategoryException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -45,6 +47,14 @@ final class ApiExceptionRenderer
                 message: $exception->getMessage(),
                 status: $exception->httpStatus,
                 details: $exception->details,
+            );
+        }
+
+        if ($exception instanceof CategoryException || $exception instanceof SeoException) {
+            return ApiResponse::error(
+                code: $exception->errorCode,
+                message: $exception->getMessage(),
+                status: $exception->httpStatus,
             );
         }
 
