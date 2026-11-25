@@ -263,9 +263,10 @@ export function BusinessProfileView({
             </div>
           </div>
 
-          {/* Right Header Actions: Share & Copy Link */}
+          {/* Right Header Actions: Save, Share & Copy Link */}
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:flex-col lg:items-end">
             <BusinessProfileActions
+              businessPublicId={profile.public_id}
               businessName={profile.name}
               canonicalUrl={canonicalUrl}
             />

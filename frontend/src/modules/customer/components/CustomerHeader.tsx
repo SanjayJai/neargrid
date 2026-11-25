@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   Bell,
+  Bookmark,
   Building2,
   ChevronDown,
   Crosshair,
@@ -301,6 +302,18 @@ export function CustomerHeader({ user, cities }: CustomerHeaderProps) {
           {/* Auth actions */}
           {user ? (
             <div className="flex items-center gap-2">
+              <Link
+                href="/saved"
+                aria-label={locale === 'ta' ? 'சேமித்த வணிகங்கள்' : 'Saved Businesses'}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  pathname === '/saved'
+                    ? 'border-brand-300 bg-brand-50 text-brand-700'
+                    : 'border-gray-200 bg-white text-ink hover:bg-gray-50'
+                }`}
+              >
+                <Bookmark className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
+                <span>{locale === 'ta' ? 'சேமித்தவை' : 'Saved'}</span>
+              </Link>
               <NotificationBellFlyout user={user} />
               <Link
                 href="/dashboard/settings"
@@ -421,6 +434,18 @@ export function CustomerHeader({ user, cities }: CustomerHeaderProps) {
 
             {user ? (
               <>
+                <Link
+                  href="/saved"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+                    pathname === '/saved'
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-ink hover:bg-gray-100'
+                  }`}
+                >
+                  <Bookmark className="h-4 w-4 text-brand-600" aria-hidden="true" />
+                  <span>{locale === 'ta' ? 'சேமித்த வணிகங்கள்' : 'Saved Businesses'}</span>
+                </Link>
                 <Link
                   href="/notifications"
                   onClick={() => setMobileOpen(false)}

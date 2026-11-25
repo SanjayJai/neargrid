@@ -13,10 +13,13 @@ import {
   VerifiedBadge,
 } from '@/shared/ui/TrustBadges';
 import { EnquiryModal } from './EnquiryModal';
+import { SaveBusinessButton } from './SaveBusinessButton';
 
 interface DirectoryListingCardProps {
   hit: SearchBusinessHitDto;
   priority?: boolean;
+  initialSaved?: boolean;
+  onSavedChange?: (saved: boolean) => void;
 }
 
 /**
@@ -25,7 +28,12 @@ interface DirectoryListingCardProps {
  * Preserves contact privacy: displays masked phone and WhatsApp availability without exposing
  * private contact numbers or implying unsupported contact-reveal flows.
  */
-export function DirectoryListingCard({ hit, priority = false }: DirectoryListingCardProps) {
+export function DirectoryListingCard({
+  hit,
+  priority = false,
+  initialSaved,
+  onSavedChange,
+}: DirectoryListingCardProps) {
   const [enquiryOpen, setEnquiryOpen] = useState(false);
 
   const citySlug = hit.city_slug ?? 'chennai';
@@ -87,13 +95,20 @@ export function DirectoryListingCard({ hit, priority = false }: DirectoryListing
               )}
             </div>
 
-            {/* Business Title */}
+            {/* Business Title & Save Button */}
             <div className="mt-2 flex items-start justify-between gap-2">
-              <Link href={profileHref} className="block group-hover:underline">
+              <Link href={profileHref} className="block min-w-0 group-hover:underline">
                 <h2 className="text-base sm:text-lg font-bold text-brand-700 line-clamp-1">
                   {hit.name}
                 </h2>
               </Link>
+              <SaveBusinessButton
+                businessPublicId={hit.public_id}
+                businessName={hit.name}
+                initialSaved={initialSaved}
+                onSavedChange={onSavedChange}
+                size="sm"
+              />
             </div>
 
             {hit.tagline && (

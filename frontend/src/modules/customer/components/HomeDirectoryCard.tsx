@@ -9,6 +9,7 @@ import {
   TrustedBadge,
   VerifiedBadge,
 } from '@/shared/ui/TrustBadges';
+import { SaveBusinessButton } from './SaveBusinessButton';
 
 interface HomeDirectoryCardProps {
   hit: SearchBusinessHitDto;
@@ -50,11 +51,18 @@ export function HomeDirectoryCard({ hit }: HomeDirectoryCardProps) {
             <OpenStatusBadge isOpenNow={hit.is_open_now} />
           </div>
 
-          <Link href={profileHref} className="mt-1.5 block">
-            <h3 className="truncate text-base font-bold text-brand-700 group-hover:underline">
-              {hit.name}
-            </h3>
-          </Link>
+          <div className="mt-1.5 flex items-start justify-between gap-2">
+            <Link href={profileHref} className="block min-w-0">
+              <h3 className="truncate text-base font-bold text-brand-700 group-hover:underline">
+                {hit.name}
+              </h3>
+            </Link>
+            <SaveBusinessButton
+              businessPublicId={hit.public_id}
+              businessName={hit.name}
+              size="sm"
+            />
+          </div>
 
           <div className="mt-1.5">
             <RatingPill ratingAvg={hit.rating_avg} reviewCount={hit.review_count} />

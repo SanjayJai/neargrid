@@ -2,16 +2,19 @@
 
 import { useState } from 'react';
 import { Check, Copy, Share2 } from 'lucide-react';
+import { SaveBusinessButton } from './SaveBusinessButton';
 
 interface BusinessProfileActionsProps {
+  businessPublicId?: string;
   businessName: string;
   canonicalUrl: string;
 }
 
 /**
- * Accessible Share (Web Share API with clipboard fallback) & Copy URL actions.
+ * Accessible Save, Share (Web Share API with clipboard fallback) & Copy URL actions.
  */
 export function BusinessProfileActions({
+  businessPublicId,
   businessName,
   canonicalUrl,
 }: BusinessProfileActionsProps) {
@@ -69,6 +72,14 @@ export function BusinessProfileActions({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {businessPublicId && (
+        <SaveBusinessButton
+          businessPublicId={businessPublicId}
+          businessName={businessName}
+          size="md"
+        />
+      )}
+
       <button
         type="button"
         onClick={handleShare}
