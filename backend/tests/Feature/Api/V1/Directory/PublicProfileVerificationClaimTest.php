@@ -287,9 +287,9 @@ final class PublicProfileVerificationClaimTest extends TestCase
             QueryException::class
         );
 
-        // RESTRICT: cannot delete locality or category referenced by a business
+        // RESTRICT: cannot force-delete locality or category referenced by a business
         $this->assertThrows(fn () => $locality->delete(), QueryException::class);
-        $this->assertThrows(fn () => $category->delete(), QueryException::class);
+        $this->assertThrows(fn () => $category->forceDelete(), QueryException::class);
 
         // CASCADE: force-deleting a business cleans up hours & staff memberships
         $biz->forceDelete();

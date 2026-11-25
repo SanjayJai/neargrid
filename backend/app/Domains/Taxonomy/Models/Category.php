@@ -13,24 +13,34 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'parent_id',
+    'node_type',
     'name',
     'slug',
     'schema_org_type',
     'icon_name',
     'image_url',
     'depth',
+    'lifecycle_status',
+    'is_system',
+    'is_assignable',
+    'has_landing_page',
     'is_featured',
+    'show_on_homepage',
+    'is_popular',
     'sort_order',
     'is_active',
+    'published_version_id',
+    'archived_at',
 ])]
 #[Hidden(['id', 'parent_id'])]
 class Category extends Model
 {
     /** @use HasFactory<CategoryFactory> */
-    use HasFactory, HasPublicUlid;
+    use HasFactory, HasPublicUlid, SoftDeletes;
 
     protected static function newFactory(): CategoryFactory
     {
@@ -44,9 +54,15 @@ class Category extends Model
     {
         return [
             'depth' => 'integer',
+            'is_system' => 'boolean',
+            'is_assignable' => 'boolean',
+            'has_landing_page' => 'boolean',
             'is_featured' => 'boolean',
+            'show_on_homepage' => 'boolean',
+            'is_popular' => 'boolean',
             'sort_order' => 'integer',
             'is_active' => 'boolean',
+            'archived_at' => 'datetime',
         ];
     }
 

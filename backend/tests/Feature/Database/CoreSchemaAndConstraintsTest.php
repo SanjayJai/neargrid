@@ -162,16 +162,19 @@ final class CoreSchemaAndConstraintsTest extends TestCase
         $this->assertSame($parent->id, $child->parent?->id);
         $this->assertCount(1, $parent->children);
 
-        // Deleting parent while children exist must fail (RESTRICT).
+        // Permanent deletion of parent while children exist must fail (RESTRICT).
         try {
-            $parent->delete();
-            $this->fail('Expected QueryException when deleting a parent category with subcategories.');
+            $parent->forceDelete();
+            $this->fail('Expected QueryException when force-deleting a parent category with subcategories.');
         } catch (QueryException) {
             $this->assertDatabaseHas('categories', ['id' => $parent->id]);
         }
 
-        // Deleting leaf child cascades category_translations.
+        // Soft-deleting leaf child preserves category_translations; permanent deletion cascades them.
         $child->delete();
+        $this->assertDatabaseHas('category_translations', ['category_id' => $child->id]);
+
+        $child->forceDelete();
         $this->assertDatabaseMissing('category_translations', ['category_id' => $child->id]);
     }
 
