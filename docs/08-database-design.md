@@ -109,17 +109,18 @@ Ephemeral security table for OTP lifecycle (pruned nightly after 24h).
 > 4. **Initial Launch Location:** **Vellore**, with Chennai seeded as reference urban center.
 > 5. **Core Application Functions:** Existing tables and foreign key relationships (`states`, `cities`, `localities`) directly power customer proximity/spatial search (`SRID 4326`), merchant onboarding address selection, canonical directory route generation (`/[city]/[category]`), and regional SEO metadata.
 
-#### `states`
-* Columns: `id`, `country_code` (`CHAR(2)`, default `'IN'`), `name` (`VARCHAR(100)`), `slug` (`VARCHAR(120)`), `is_active` (`BOOLEAN`).
-* **Indexes:** `UNIQUE(country_code, slug)`.
+#### `states` & `state_translations`
+* `states`: `id`, `public_id` (`CHAR(26) UNIQUE`), `country_code` (`CHAR(2)`, default `'IN'`), `name` (`VARCHAR(100)`), `slug` (`VARCHAR(120)`), `sort_order` (`SMALLINT UNSIGNED DEFAULT 0`), `is_active` (`BOOLEAN`).
+* **Indexes:** `UNIQUE(public_id)`, `UNIQUE(country_code, slug)`, `UNIQUE(country_code, name)`, `INDEX(is_active, sort_order)`.
+* `state_translations`: `id`, `state_id` (`FK -> states.id ON DELETE CASCADE`), `locale` (`VARCHAR(10)`), `name` (`VARCHAR(140)`), `UNIQUE(state_id, locale)`.
 
 #### `cities`
-* Columns: `id`, `state_id` (`FK -> states.id ON DELETE RESTRICT`), `name` (`VARCHAR(100)`), `slug` (`VARCHAR(120)`, `UNIQUE`), `latitude` (`DECIMAL(10,7)`), `longitude` (`DECIMAL(10,7)`), `center_point` (`POINT NOT NULL SRID 4326`), `timezone` (`VARCHAR(64)`, default `'Asia/Kolkata'`), `is_popular` (`BOOLEAN DEFAULT 0`), `sort_order` (`SMALLINT UNSIGNED DEFAULT 0`), `seo_title` (`VARCHAR(160)`), `seo_description` (`VARCHAR(320)`), `is_active` (`BOOLEAN DEFAULT 1`).
-* **Indexes:** `UNIQUE(slug)`, `SPATIAL INDEX(center_point)`, `INDEX(is_active, is_popular, sort_order)`.
+* Columns: `id`, `public_id` (`CHAR(26) UNIQUE`), `state_id` (`FK -> states.id ON DELETE RESTRICT`), `name` (`VARCHAR(100)`), `slug` (`VARCHAR(120)`, `UNIQUE`), `latitude` (`DECIMAL(10,7)`), `longitude` (`DECIMAL(10,7)`), `center_point` (`POINT NOT NULL SRID 4326`), `timezone` (`VARCHAR(64)`, default `'Asia/Kolkata'`), `is_popular` (`BOOLEAN DEFAULT 0`), `sort_order` (`SMALLINT UNSIGNED DEFAULT 0`), `seo_title` (`VARCHAR(160)`), `seo_description` (`VARCHAR(320)`), `is_active` (`BOOLEAN DEFAULT 1`).
+* **Indexes:** `UNIQUE(public_id)`, `UNIQUE(slug)`, `SPATIAL INDEX(center_point)`, `INDEX(is_active, is_popular, sort_order)`.
 
 #### `localities`
-* Columns: `id`, `city_id` (`FK -> cities.id ON DELETE RESTRICT`), `name` (`VARCHAR(120)`), `slug` (`VARCHAR(140)`), `pincode` (`VARCHAR(12)`, `NULL`), `latitude` (`DECIMAL(10,7)`), `longitude` (`DECIMAL(10,7)`), `center_point` (`POINT NOT NULL SRID 4326`), `is_popular` (`BOOLEAN DEFAULT 0`), `is_active` (`BOOLEAN DEFAULT 1`).
-* **Indexes:** `UNIQUE(city_id, slug)`, `SPATIAL INDEX(center_point)`, `INDEX(city_id, pincode)`, `INDEX(city_id, is_active, is_popular)`.
+* Columns: `id`, `public_id` (`CHAR(26) UNIQUE`), `city_id` (`FK -> cities.id ON DELETE RESTRICT`), `name` (`VARCHAR(120)`), `slug` (`VARCHAR(140)`), `pincode` (`VARCHAR(12)`, `NULL`), `latitude` (`DECIMAL(10,7)`), `longitude` (`DECIMAL(10,7)`), `center_point` (`POINT NOT NULL SRID 4326`), `is_popular` (`BOOLEAN DEFAULT 0`), `sort_order` (`SMALLINT UNSIGNED DEFAULT 0`), `is_active` (`BOOLEAN DEFAULT 1`).
+* **Indexes:** `UNIQUE(public_id)`, `UNIQUE(city_id, slug)`, `SPATIAL INDEX(center_point)`, `INDEX(city_id, pincode)`, `INDEX(city_id, is_active, sort_order)`.
 
 ---
 

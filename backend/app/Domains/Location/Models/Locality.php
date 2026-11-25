@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domains\Location\Models;
 
+use App\Domains\Directory\Models\Business;
+use App\Domains\Leads\Models\Enquiry;
+use App\Domains\Location\Concerns\HasLocalizedTranslations;
+use App\Support\Concerns\HasPublicUlid;
 use App\Support\Concerns\HasSpatialCenterPoint;
 use Database\Factories\LocalityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,13 +25,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'latitude',
     'longitude',
     'is_popular',
+    'sort_order',
     'is_active',
 ])]
-#[Hidden(['center_point'])]
+#[Hidden(['id', 'city_id', 'center_point'])]
 class Locality extends Model
 {
     /** @use HasFactory<LocalityFactory> */
-    use HasFactory, HasSpatialCenterPoint;
+    use HasFactory, HasLocalizedTranslations, HasPublicUlid, HasSpatialCenterPoint;
 
     protected static function newFactory(): LocalityFactory
     {
@@ -44,6 +48,7 @@ class Locality extends Model
             'latitude' => 'float',
             'longitude' => 'float',
             'is_popular' => 'boolean',
+            'sort_order' => 'integer',
             'is_active' => 'boolean',
         ];
     }
@@ -64,29 +69,19 @@ class Locality extends Model
         return $this->hasMany(LocalityTranslation::class);
     }
 
-    public function translationFor(string $locale, string $fallbackLocale = 'en'): ?LocalityTranslation
+    /**
+     * @return HasMany<Business, $this>
+     */
+    public function businesses(): HasMany
     {
-        $translations = $this->relationLoaded('translations')
-            ? $this->translations
-            : $this->translations()->whereIn('locale', [$locale, $fallbackLocale])->get();
-
-        return $translations->firstWhere('locale', $locale)
-            ?? $translations->firstWhere('locale', $fallbackLocale);
-    }
-
-    public function translatedName(string $locale = 'en'): string
-    {
-        return $this->translationFor($locale)?->name ?? $this->name;
+        return $this->hasMany(Business::class);
     }
 
     /**
-     * @param  Builder<self>  $query
-     * @return Builder<self>
+     * @return HasMany<Enquiry, $this>
      */
-    public function scopeWithLocale(Builder $query, string $locale = 'en'): Builder
+    public function enquiries(): HasMany
     {
-        $locales = array_values(array_unique([$locale, 'en']));
-
-        return $query->with(['translations' => fn ($q) => $q->whereIn('locale', $locales)]);
+        return $this->hasMany(Enquiry::class);
     }
 }

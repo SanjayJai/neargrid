@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Database;
 
+use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\Locality;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,5 +48,27 @@ final class MySql8SpatialIntegrationTest extends TestCase
             ['பல் மருத்துவர்']
         );
         $this->assertNotEmpty($tamilMatch);
+
+        // Verify City & Locality SRID 4326 center_point persistence on insert and update.
+        $city = City::factory()->create([
+            'state_id' => $tNagar->city->state_id,
+            'latitude' => 12.9165167,
+            'longitude' => 79.1324986,
+        ]);
+
+        $citySrid = (int) DB::selectOne('SELECT ST_SRID(center_point) AS srid FROM cities WHERE id = ?', [$city->id])->srid;
+        $this->assertSame(4326, $citySrid);
+
+        $city->update(['latitude' => 12.9500000, 'longitude' => 79.1500000]);
+        $updatedLat = (float) DB::selectOne('SELECT ST_Latitude(center_point) AS lat FROM cities WHERE id = ?', [$city->id])->lat;
+        $this->assertEqualsWithDelta(12.95, $updatedLat, 0.001);
+
+        $locality = Locality::factory()->create([
+            'city_id' => $city->id,
+            'latitude' => 12.9698000,
+            'longitude' => 79.1459000,
+        ]);
+        $locSrid = (int) DB::selectOne('SELECT ST_SRID(center_point) AS srid FROM localities WHERE id = ?', [$locality->id])->srid;
+        $this->assertSame(4326, $locSrid);
     }
 }

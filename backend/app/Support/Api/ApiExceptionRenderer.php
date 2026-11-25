@@ -6,6 +6,7 @@ namespace App\Support\Api;
 
 use App\Domains\Directory\Exceptions\DirectoryException;
 use App\Domains\Identity\Exceptions\IdentityException;
+use App\Domains\Location\Exceptions\LocationException;
 use App\Domains\Media\Exceptions\MediaException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -30,6 +31,15 @@ final class ApiExceptionRenderer
         }
 
         if ($exception instanceof DirectoryException) {
+            return ApiResponse::error(
+                code: $exception->errorCode,
+                message: $exception->getMessage(),
+                status: $exception->httpStatus,
+                details: $exception->details,
+            );
+        }
+
+        if ($exception instanceof LocationException) {
             return ApiResponse::error(
                 code: $exception->errorCode,
                 message: $exception->getMessage(),

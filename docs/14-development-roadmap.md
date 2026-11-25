@@ -14,7 +14,8 @@ This roadmap translates the Phase 2 architecture specifications into a low-risk,
 flowchart LR
     P3A["Phase 3A: Foundation<br/>(Completed)<br/>Repos, DB, Auth, Taxonomy"] --> P3B["Phase 3B: Public Directory & Search<br/>(Completed)<br/>SEO Pages, Spatial Search, Profiles"]
     P3B --> P3C["Phase 3C: Leads, Reviews & Admin APIs<br/>(Completed)<br/>Consent Leads, Reviews, Admin APIs, ISR"]
-    P3C --> P3D["Phase 3D: Monetization & Billing<br/>(Upcoming)<br/>Subscriptions, Razorpay/Stripe, Sponsored"]
+    P3C --> MA0["M-A0: Location Management<br/>(Completed)<br/>States/Cities/Localities CRUD, EN/TA, Audit"]
+    MA0 --> P3D["Phase 3D: Monetization & Billing<br/>(Upcoming)<br/>Subscriptions, Razorpay/Stripe, Sponsored"]
     P3D --> P3E["Phase 3E: Production Hardening<br/>(Upcoming)<br/>Backups, Sitemaps, Load Testing, APM"]
     P3E --> P3F["Phase 3F: Next.js Super Admin Dashboard<br/>(Upcoming)<br/>Admin UI, KYC Review, Moderation Queue"]
     P3F --> P4["Phase 4: Post-Launch Scale<br/>(Stage 2 Roadmap)<br/>Flutter Apps, Meilisearch, Call Masking"]

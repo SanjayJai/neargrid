@@ -6,6 +6,7 @@ import type {
   ReferenceCategoryDto,
   ReferenceCityDto,
   ReferenceLocalityDto,
+  ReferenceStateDto,
   SearchBusinessHitDto,
   SearchFiltersDataDto,
   SearchFiltersMetaDto,
@@ -125,11 +126,30 @@ async function safePublicGet<T, M = unknown>(
   }
 }
 
+export async function fetchPublicStates(
+  locale: 'en' | 'ta' = 'en',
+  options?: { countryCode?: string; q?: string }
+): Promise<PublicApiResult<ReferenceStateDto[]>> {
+  const params = new URLSearchParams({ locale });
+  if (options?.countryCode) params.set('country_code', options.countryCode);
+  if (options?.q) params.set('q', options.q);
+
+  return safePublicGet<ReferenceStateDto[]>(
+    `/api/v1/locations/states?${params.toString()}`,
+    300
+  );
+}
+
 export async function fetchPublicCities(
-  locale: 'en' | 'ta' = 'en'
+  locale: 'en' | 'ta' = 'en',
+  options?: { state?: string; q?: string }
 ): Promise<PublicApiResult<ReferenceCityDto[]>> {
+  const params = new URLSearchParams({ locale });
+  if (options?.state) params.set('state', options.state);
+  if (options?.q) params.set('q', options.q);
+
   return safePublicGet<ReferenceCityDto[]>(
-    `/api/v1/locations/cities?locale=${encodeURIComponent(locale)}`,
+    `/api/v1/locations/cities?${params.toString()}`,
     300
   );
 }

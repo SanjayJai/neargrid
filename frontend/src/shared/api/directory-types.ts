@@ -9,21 +9,37 @@ import type { ApiMeta } from '@/lib/bff/types';
 // Reference Locations, Taxonomy & Attributes (ReferenceTaxonomyController)
 // ---------------------------------------------------------------------------
 
-export interface ReferenceCityDto {
+export interface ReferenceStateDto {
+  public_id: string;
+  country_code: string;
   slug: string;
   name: string;
   name_en: string;
+  cities_count: number;
+  sort_order: number;
+}
+
+export interface ReferenceCityDto {
+  public_id?: string;
+  slug: string;
+  name: string;
+  name_en: string;
+  state_slug?: string | null;
+  state_name?: string | null;
   latitude: number | null;
   longitude: number | null;
   is_popular: boolean;
 }
 
 export interface ReferenceLocalityDto {
+  public_id?: string;
   slug: string;
   name: string;
+  name_en?: string;
   pincode: string | null;
   latitude: number | null;
   longitude: number | null;
+  is_popular?: boolean;
 }
 
 export interface ReferenceCategoryChildDto {

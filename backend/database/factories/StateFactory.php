@@ -26,6 +26,7 @@ class StateFactory extends Factory
             'country_code' => 'IN',
             'name' => $name,
             'slug' => Str::slug($name),
+            'sort_order' => 0,
             'is_active' => true,
         ];
     }

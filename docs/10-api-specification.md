@@ -189,8 +189,9 @@ All communication between Next.js and Laravel routes through secure server-side 
 | Method | Path | Auth | Description |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/home` | Public | Aggregated homepage payload (popular cities, featured categories, active banners, trending searches for `city` param). Cached in Redis. |
-| `GET` | `/api/v1/locations/cities` | Public | Lists active cities (`?popular_only=1&q=mum`). |
-| `GET` | `/api/v1/locations/cities/{citySlug}/localities` | Public | Lists localities and pincodes for a city. |
+| `GET` | `/api/v1/locations/states` | Public | Lists active states (`?locale=en\|ta&country_code=IN&q=tamil&per_page=25`) with localized names and active `cities_count`. |
+| `GET` | `/api/v1/locations/cities` | Public | Lists active cities (`?state=tamil-nadu&q=chen&locale=en\|ta&per_page=25`) under active states. |
+| `GET` | `/api/v1/locations/cities/{citySlug}/localities` | Public | Lists active localities and pincodes for an active city (`?q=adyar&locale=en\|ta`). |
 | `GET` | `/api/v1/locations/resolve` | Public | Resolves `?lat=19.14&lng=72.83` to nearest city & locality using MySQL spatial index. |
 | `GET` | `/api/v1/categories` | Public | Full nested category tree (`?featured_only=1`). |
 | `GET` | `/api/v1/categories/{slug}` | Public | Category metadata, child subcategories, SEO templates, and schema.org type. |
@@ -304,6 +305,23 @@ All communication between Next.js and Laravel routes through secure server-side 
 | Method | Path | Security | Description |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/webhooks/payments/{gateway}` | Raw-body HMAC-SHA256 Signature Verification | Verifies signature (`X-Razorpay-Signature` / `Stripe-Signature` with `<=300s` replay tolerance) via `hash_equals()`; returns `401` on mismatch. Deduplicates via `webhook_events(gateway, provider_event_id)` (`200 OK` immediately for duplicates). Dispatches `ProcessPaymentWebhookJob` on the `critical` queue (`tries=5`, exponential backoff `[15s, 60s, 300s, 900s, 1800s]`). Failures land in `failed_jobs` with P1 alerting and deterministic replay from `webhook_events` via Blade Admin or Artisan. |
+
+---
+
+### 5.8 Super Admin Location Management (`/api/v1/admin/locations/*`)
+*Strictly restricted to `super_admin` (`auth:sanctum` + `active` + `LocationPolicy`). All mutations create immutable `audit_logs`, enforce hierarchy & dependency guards (`409 LOCATION_HAS_DEPENDENCIES`, `422 LOCATION_MOVE_REQUIRES_MIGRATION`), and record `301` redirects in `url_redirects` when city or locality slugs change.*
+
+| Method | Path | Description |
+| :--- | :--- | :--- |
+| `GET`, `POST` | `/api/v1/admin/locations/states` | List paginated states or create a state with EN/TA `state_translations`. |
+| `GET`, `PUT`/`PATCH`, `DELETE` | `/api/v1/admin/locations/states/{statePublicId}` | Inspect dependencies, update details/translations, or hard-delete (blocked with `409` if cities exist). |
+| `POST` | `/api/v1/admin/locations/states/{statePublicId}/archive` | Safely deactivate (`is_active = false`) a state. |
+| `GET`, `POST` | `/api/v1/admin/locations/cities` | List paginated cities (`?state=...`) or create a city with `SRID 4326` coordinates & `city_translations`. |
+| `GET`, `PUT`/`PATCH`, `DELETE` | `/api/v1/admin/locations/cities/{cityPublicId}` | Inspect dependencies, update (creates `301` redirects on slug change; blocks cross-state move if dependencies exist), or hard-delete (`409` if localities/businesses/enquiries exist). |
+| `POST` | `/api/v1/admin/locations/cities/{cityPublicId}/archive` | Safely deactivate (`is_active = false`) a city. |
+| `GET`, `POST` | `/api/v1/admin/locations/localities` | List paginated localities (`?city=...&state=...`) or create a locality with `SRID 4326` coordinates & `locality_translations`. |
+| `GET`, `PUT`/`PATCH`, `DELETE` | `/api/v1/admin/locations/localities/{localityPublicId}` | Inspect dependencies, update (creates `301` redirects on slug change; blocks cross-city move if dependencies exist), or hard-delete (`409` if businesses/enquiries exist). |
+| `POST` | `/api/v1/admin/locations/localities/{localityPublicId}/archive` | Safely deactivate (`is_active = false`) a locality. |
 
 ---
 

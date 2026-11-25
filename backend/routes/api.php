@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Account\SavedBusinessController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
+use App\Http\Controllers\Api\V1\Admin\AdminLocationController;
 use App\Http\Controllers\Api\V1\Admin\AdminReviewController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\AdminVerificationController;
@@ -30,6 +31,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::get('/meta', [SystemController::class, 'meta'])->name('meta');
 
     // Reference locations, taxonomy & attributes (English/Tamil)
+    Route::get('/locations/states', [ReferenceTaxonomyController::class, 'states'])->name('locations.states');
     Route::get('/locations/cities', [ReferenceTaxonomyController::class, 'cities'])->name('locations.cities');
     Route::get('/locations/cities/{citySlug}/localities', [ReferenceTaxonomyController::class, 'localities'])->name('locations.localities');
     Route::get('/categories', [ReferenceTaxonomyController::class, 'categories'])->name('categories.index');
@@ -163,6 +165,30 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::post('/users/{user}/revoke-sessions', [AdminUserController::class, 'revokeSessions'])->name('users.revoke-sessions');
 
             Route::get('/audit-logs', [AdminAuditLogController::class, 'index'])->name('audit-logs.index');
+
+            // Master Super Admin Location Management (States, Cities & Localities)
+            Route::prefix('locations')->name('locations.')->group(function (): void {
+                Route::get('/states', [AdminLocationController::class, 'indexStates'])->name('states.index');
+                Route::post('/states', [AdminLocationController::class, 'storeState'])->name('states.store');
+                Route::get('/states/{state}', [AdminLocationController::class, 'showState'])->name('states.show');
+                Route::match(['put', 'patch'], '/states/{state}', [AdminLocationController::class, 'updateState'])->name('states.update');
+                Route::post('/states/{state}/archive', [AdminLocationController::class, 'archiveState'])->name('states.archive');
+                Route::delete('/states/{state}', [AdminLocationController::class, 'destroyState'])->name('states.destroy');
+
+                Route::get('/cities', [AdminLocationController::class, 'indexCities'])->name('cities.index');
+                Route::post('/cities', [AdminLocationController::class, 'storeCity'])->name('cities.store');
+                Route::get('/cities/{city}', [AdminLocationController::class, 'showCity'])->name('cities.show');
+                Route::match(['put', 'patch'], '/cities/{city}', [AdminLocationController::class, 'updateCity'])->name('cities.update');
+                Route::post('/cities/{city}/archive', [AdminLocationController::class, 'archiveCity'])->name('cities.archive');
+                Route::delete('/cities/{city}', [AdminLocationController::class, 'destroyCity'])->name('cities.destroy');
+
+                Route::get('/localities', [AdminLocationController::class, 'indexLocalities'])->name('localities.index');
+                Route::post('/localities', [AdminLocationController::class, 'storeLocality'])->name('localities.store');
+                Route::get('/localities/{locality}', [AdminLocationController::class, 'showLocality'])->name('localities.show');
+                Route::match(['put', 'patch'], '/localities/{locality}', [AdminLocationController::class, 'updateLocality'])->name('localities.update');
+                Route::post('/localities/{locality}/archive', [AdminLocationController::class, 'archiveLocality'])->name('localities.archive');
+                Route::delete('/localities/{locality}', [AdminLocationController::class, 'destroyLocality'])->name('localities.destroy');
+            });
         });
 
         // Short-lived, actor-bound, signature-verified private KYC download endpoint

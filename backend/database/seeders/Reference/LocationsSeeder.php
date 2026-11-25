@@ -9,6 +9,7 @@ use App\Domains\Location\Models\CityTranslation;
 use App\Domains\Location\Models\Locality;
 use App\Domains\Location\Models\LocalityTranslation;
 use App\Domains\Location\Models\State;
+use App\Domains\Location\Models\StateTranslation;
 use Illuminate\Database\Seeder;
 
 class LocationsSeeder extends Seeder
@@ -16,19 +17,31 @@ class LocationsSeeder extends Seeder
     public function run(): void
     {
         $states = [
-            'tamil-nadu' => ['name' => 'Tamil Nadu', 'country_code' => 'IN'],
-            'maharashtra' => ['name' => 'Maharashtra', 'country_code' => 'IN'],
-            'karnataka' => ['name' => 'Karnataka', 'country_code' => 'IN'],
-            'delhi' => ['name' => 'Delhi', 'country_code' => 'IN'],
-            'telangana' => ['name' => 'Telangana', 'country_code' => 'IN'],
+            'tamil-nadu' => ['name' => 'Tamil Nadu', 'name_ta' => 'தமிழ்நாடு', 'country_code' => 'IN', 'sort_order' => 1],
+            'maharashtra' => ['name' => 'Maharashtra', 'name_ta' => 'மகாராஷ்டிரா', 'country_code' => 'IN', 'sort_order' => 2],
+            'karnataka' => ['name' => 'Karnataka', 'name_ta' => 'கர்நாடகா', 'country_code' => 'IN', 'sort_order' => 3],
+            'delhi' => ['name' => 'Delhi', 'name_ta' => 'தில்லி', 'country_code' => 'IN', 'sort_order' => 4],
+            'telangana' => ['name' => 'Telangana', 'name_ta' => 'தெலங்கானா', 'country_code' => 'IN', 'sort_order' => 5],
         ];
 
         $stateModels = [];
         foreach ($states as $slug => $data) {
-            $stateModels[$slug] = State::query()->updateOrCreate(
+            $state = State::query()->updateOrCreate(
                 ['country_code' => $data['country_code'], 'slug' => $slug],
-                ['name' => $data['name'], 'is_active' => true]
+                ['name' => $data['name'], 'sort_order' => $data['sort_order'], 'is_active' => true]
             );
+
+            StateTranslation::query()->updateOrCreate(
+                ['state_id' => $state->id, 'locale' => 'en'],
+                ['name' => $data['name']]
+            );
+
+            StateTranslation::query()->updateOrCreate(
+                ['state_id' => $state->id, 'locale' => 'ta'],
+                ['name' => $data['name_ta']]
+            );
+
+            $stateModels[$slug] = $state;
         }
 
         $cities = [
