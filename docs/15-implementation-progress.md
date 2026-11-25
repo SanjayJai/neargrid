@@ -2,12 +2,12 @@
 
 ## 1. Current Status Summary
 
-* **Active Phase:** Stage 1 — Saved Businesses (Customer Notifications V1 Completed)
-* **Current Milestone Completed:** **Customer Notifications (Milestones 1–4 + Corrective Fixes)**
-* **Latest Verified Commit:** `9713b6e` on branch `main`
+* **Active Phase:** Stage 1 — Saved Businesses Completed (Milestones 1–4)
+* **Current Milestone Completed:** **Saved Businesses (Milestones 1–4)**
+* **Latest Verified Commit:** `c8e1da3` on branch `main`
 * **Stack Compliance Check:**
-  * Backend: Laravel `v13.43.0` (PHP `8.3.36`), `laravel/sanctum v4.5.0`, `predis/predis v3.7.1`, `league/flysystem-aws-s3-v3 v3.35.3`, **Zero Filament** (144 tests passed, 5 external daemon skipped)
-  * Frontend: Single Next.js `14.2.35` (App Router) + React `18.3.1` + TypeScript `5.7.2` + Tailwind CSS `3.4.19` + `ioredis` (All 35 routes compiled statically/dynamically with zero TypeScript errors, 150 Vitest tests passed)
+  * Backend: Laravel `v13.43.0` (PHP `8.3.36`), `laravel/sanctum v4.5.0`, `predis/predis v3.7.1`, `league/flysystem-aws-s3-v3 v3.35.3`, **Zero Filament** (158 tests passed, 5 external daemon skipped; Pint passed)
+  * Frontend: Single Next.js `14.2.35` (App Router) + React `18.3.1` + TypeScript `5.7.2` + Tailwind CSS `3.4.19` + `ioredis` (All 38 routes compiled with zero TypeScript errors, 192 Vitest tests passed)
   * Location Architecture: State → City → Locality (no country management; launch location: Vellore)
 
 ---
@@ -31,7 +31,7 @@
 | **Phase 3C — M3** | Customer Reviews & Bayesian Ratings: Atomic Redis-locked review submission (30-day duplicate protection), verified customer badge qualification, encrypted OTP queues, owner replies, Bayesian rating recalculation | **Completed & Verified** | Backend tests: **98 passed**; Audit corrections applied | `cc0a257` |
 | **Phase 3C — M4** | Super Admin APIs & Signed Realtime ISR Revalidation: `/api/v1/admin/*` endpoints (Enquiries, Reviews moderation, KYC verifications queue with 60s actor-bound signed URLs, User suspension & session revocation, Immutable audit logs), Next.js signed HMAC-SHA256 webhook `/api/revalidate`, and service/media/directory invalidation triggers | **Completed & Verified** | Backend tests: **105 passed, 5 skipped**; Frontend Vitest: **113 passed**; `next build`: **31/31 routes**; E2E workflow: **8/8 steps passed** | `f62f1df` |
 | **Stage 1 — Customer Notifications (M1–M4)** | Full-stack Customer Notifications: Custom database channel with atomic deduplication (`notifications_dedup_unique`), 6 lifecycle triggers (enquiry submit/OTP, business dispatch, lead status update, admin cancellation, review reply, account security), 5 secure Next.js BFF routes (`/api/account/notifications/*`), safe action URL validation (`isSafeInternalNavigationUrl`), Notification Centre (`/notifications`), and header bell flyout with live unread counter | **Completed & Verified** | Backend tests: **144 passed, 5 skipped** (39 notification tests); Frontend Vitest: **150 passed** (37 notification tests); `tsc` & `next build` (**35/35 routes**): **passed**; Pint: **passed** | `9713b6e` |
-| **Stage 1 — Saved Businesses (M1)** | Backend Domain, Database & REST API: `saved_businesses` table (`PRIMARY KEY(user_id, business_id)`), `SavedBusiness` model, Eloquent relationships on `User` & `Business`, `SavedBusinessService` with idempotent save/unsave, active published visibility scoping, lightweight `/ids` endpoint, and 4 REST API endpoints under `account/saved-businesses` | **Completed & Verified** | Backend tests: **158 passed, 5 skipped** (14 saved-business tests, 120 assertions); Pint: **passed** | Pending Commit |
+| **Stage 1 — Saved Businesses (M1–M4)** | Full-stack Customer Saved Businesses: `saved_businesses` table (`PRIMARY KEY(user_id, business_id)`), `SavedBusinessService` with idempotent save/unsave & active visibility filtering, 4 Laravel REST endpoints, 4 Next.js BFF routes with Origin/CSRF/ULID validation, `SavedBusinessesProvider` with 500-ID cap `'unknown'` state & optimistic rollback, `SaveBusinessButton` across `BusinessProfileActions`, `DirectoryListingCard`, and `HomeDirectoryCard`, plus `/saved` hub & `CustomerHeader` navigation | **Completed & Verified** | Backend tests: **158 passed, 5 skipped** (14 saved-business tests); Pint: **passed**; Frontend Vitest: **192 passed** (42 saved-business tests); `tsc` & `next build` (**38/38 routes**): **passed** | `c8e1da3` |
 | **Phase 3D** | Monetization, Subscriptions, Razorpay/Stripe, Sponsored Placements | Pending | Scheduled for Stage 1 | — |
 | **Phase 3E** | Production Hardening, Automated XML Sitemaps, Backup/DR Drills | Pending | Scheduled for Stage 1 | — |
 | **Phase 3F** | Next.js Super Admin Dashboard (`src/app/(admin)/*`, zero Filament) | Pending | Scheduled for Stage 1 | — |
