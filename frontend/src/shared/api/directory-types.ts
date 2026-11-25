@@ -55,6 +55,144 @@ export interface ReferenceCategoryDto extends ReferenceCategoryChildDto {
   children: ReferenceCategoryChildDto[];
 }
 
+// ---------------------------------------------------------------------------
+// M-A1 Category Engine & Global SEO DTOs
+// ---------------------------------------------------------------------------
+
+export type CategoryNodeTypeDto =
+  | 'main_category'
+  | 'category_group'
+  | 'subcategory'
+  | 'speciality'
+  | 'sub_speciality';
+
+export type CategoryLifecycleStatusDto = 'draft' | 'review' | 'published' | 'archived';
+
+export interface CategoryTreeNodeDto {
+  public_id: string;
+  slug: string;
+  path: string;
+  name: string;
+  name_en: string;
+  node_type: CategoryNodeTypeDto;
+  depth: number;
+  schema_org_type: string;
+  icon_name: string | null;
+  is_assignable: boolean;
+  has_landing_page: boolean;
+  show_on_homepage: boolean;
+  is_popular: boolean;
+  is_featured: boolean;
+  sort_order: number;
+  children: CategoryTreeNodeDto[];
+}
+
+export interface CategoryCollectionDto {
+  public_id: string;
+  slug: string;
+  path: string;
+  name: string;
+  name_en: string;
+  icon_name: string | null;
+  show_on_homepage: boolean;
+  is_popular: boolean;
+  category_slugs: string[];
+}
+
+export interface CategoryTreeResponseDto {
+  categories: CategoryTreeNodeDto[];
+  collections: CategoryCollectionDto[];
+}
+
+export interface CategoryAttributeDefinitionDto {
+  public_id: string;
+  attribute_key: string;
+  label_en: string;
+  label_ta: string | null;
+  data_type: 'string' | 'number' | 'boolean' | 'enum' | 'multi_enum';
+  options_json: string[] | null;
+  unit: string | null;
+  is_filterable: boolean;
+  is_required: boolean;
+  show_on_profile: boolean;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface CategoryFilterConfigDto {
+  filter_key: string;
+  filter_type: 'checkbox' | 'range' | 'toggle' | 'select';
+  label_en: string;
+  label_ta: string | null;
+  sort_order: number;
+  is_enabled: boolean;
+}
+
+export interface CategoryProfileSectionDto {
+  section_key: string;
+  display_label_en: string;
+  display_label_ta: string | null;
+  is_enabled: boolean;
+  is_required: boolean;
+  suppress_when_empty: boolean;
+  sort_order: number;
+}
+
+export interface CategoryBreadcrumbDto {
+  name: string;
+  url: string;
+}
+
+export interface GlobalSeoPayloadDto {
+  title: string;
+  description: string;
+  canonical_url: string;
+  robots: string;
+  indexable: boolean;
+  indexability_reason: string;
+  alternates: Record<string, string>;
+  open_graph: {
+    title: string;
+    description: string;
+    image_url: string | null;
+    image_alt: string;
+    url: string;
+  };
+  json_ld: Record<string, unknown>;
+}
+
+export interface CategoryLandingResponseDto {
+  redirect: boolean;
+  http_status?: number;
+  target_path?: string;
+  kind?: 'category' | 'collection';
+  category?: {
+    public_id: string;
+    slug: string;
+    path: string;
+    name: string;
+    node_type: CategoryNodeTypeDto;
+    depth: number;
+    schema_org_type: string;
+    has_landing_page: boolean;
+    children: Array<{
+      public_id: string;
+      slug: string;
+      path: string;
+      name: string;
+      node_type: CategoryNodeTypeDto;
+    }>;
+  };
+  collection?: {
+    public_id: string;
+    slug: string;
+    name: string;
+    description: string | null;
+  };
+  breadcrumbs?: CategoryBreadcrumbDto[];
+  seo?: GlobalSeoPayloadDto;
+}
+
 export interface ReferenceAttributesDto {
   amenities: Array<{
     slug: string;

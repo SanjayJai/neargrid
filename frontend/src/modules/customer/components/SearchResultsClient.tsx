@@ -18,8 +18,7 @@ import {
   urlSearchParamsToRecord,
 } from '@/modules/customer/lib/search-url';
 import { DirectoryListingCard } from './DirectoryListingCard';
-import { QuickFilterBar } from './QuickFilterBar';
-import { SearchFilterSidebar } from './SearchFilterSidebar';
+import { HorizontalFilterBar } from './HorizontalFilterBar';
 import { SearchPagination } from './SearchPagination';
 
 interface SearchResultsClientProps {
@@ -46,7 +45,6 @@ export function SearchResultsClient({
   const filtersData = initialFiltersData;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const isInitialMount = useRef(true);
@@ -164,9 +162,12 @@ export function SearchResultsClient({
 
   const handleResetFilters = () => {
     updateParamsAndUrl({
+      q: undefined,
       locality: undefined,
       category: undefined,
       localities: undefined,
+      amenities: undefined,
+      payment_methods: undefined,
       min_rating: undefined,
       verified_only: undefined,
       open_now: undefined,
@@ -231,29 +232,21 @@ export function SearchResultsClient({
         </div>
       </div>
 
-      {/* Main 2-column Layout */}
-      <div className="flex flex-col gap-6 lg:flex-row">
-        {/* Left Filter Sidebar */}
-        <SearchFilterSidebar
-          filtersData={filtersData}
-          currentParams={currentParams}
-          onFilterChange={updateParamsAndUrl}
-          onResetFilters={handleResetFilters}
-          isMobileOpen={mobileFiltersOpen}
-          onCloseMobile={() => setMobileFiltersOpen(false)}
-        />
+      {/* Full-Width Horizontal Filter Bar */}
+      <HorizontalFilterBar
+        currentParams={currentParams}
+        filtersData={filtersData}
+        onFilterChange={updateParamsAndUrl}
+        onResetFilters={handleResetFilters}
+        hasActiveFilters={hasActiveFilters}
+        totalResults={totalResults}
+        sponsoredCount={sponsoredCount}
+        showSearchWithin
+        locale={currentParams.locale === 'ta' ? 'ta' : 'en'}
+      />
 
-        {/* Right Listings Column */}
-        <div className="flex-1 min-w-0 space-y-4">
-          {/* Quick Filter Bar */}
-          <QuickFilterBar
-            currentParams={currentParams}
-            onFilterChange={updateParamsAndUrl}
-            onResetFilters={handleResetFilters}
-            onOpenMobileFilters={() => setMobileFiltersOpen(true)}
-            hasActiveFilters={hasActiveFilters}
-            sortOptions={filtersData?.sort_options}
-          />
+      {/* Full-Width Business Results */}
+      <div className="mt-5 w-full space-y-4">
 
           {/* Results State */}
           {loading ? (
@@ -303,7 +296,6 @@ export function SearchResultsClient({
               />
             </div>
           )}
-        </div>
       </div>
     </div>
   );

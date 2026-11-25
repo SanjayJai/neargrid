@@ -1,6 +1,8 @@
 import { callLaravelApi } from '@/lib/bff/laravel-client';
 import type { ApiErrorEnvelope } from '@/lib/bff/types';
 import type {
+  CategoryLandingResponseDto,
+  CategoryTreeResponseDto,
   PublicBusinessProfileDto,
   ReferenceAttributesDto,
   ReferenceCategoryDto,
@@ -170,6 +172,31 @@ export async function fetchPublicCategories(
   return safePublicGet<ReferenceCategoryDto[]>(
     `/api/v1/categories?locale=${encodeURIComponent(locale)}`,
     300
+  );
+}
+
+export async function fetchPublicCategoryTree(
+  locale: 'en' | 'ta' = 'en'
+): Promise<PublicApiResult<CategoryTreeResponseDto>> {
+  return safePublicGet<CategoryTreeResponseDto>(
+    `/api/v1/categories/tree?locale=${encodeURIComponent(locale)}`,
+    300
+  );
+}
+
+export async function fetchPublicCategoryLanding(
+  slugPath: string,
+  locale: 'en' | 'ta' = 'en'
+): Promise<PublicApiResult<CategoryLandingResponseDto>> {
+  const encodedPath = slugPath
+    .split('/')
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join('/');
+
+  return safePublicGet<CategoryLandingResponseDto>(
+    `/api/v1/categories/landing/${encodedPath}?locale=${encodeURIComponent(locale)}`,
+    120
   );
 }
 

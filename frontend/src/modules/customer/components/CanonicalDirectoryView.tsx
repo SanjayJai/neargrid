@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MapPin } from 'lucide-react';
@@ -14,8 +14,7 @@ import { Breadcrumbs, type BreadcrumbItem } from '@/shared/ui/Breadcrumbs';
 import { DirectoryCardSkeleton } from '@/shared/ui/Skeletons';
 import { EmptyState } from '@/shared/ui/StateFeedback';
 import { DirectoryListingCard } from './DirectoryListingCard';
-import { QuickFilterBar } from './QuickFilterBar';
-import { SearchFilterSidebar } from './SearchFilterSidebar';
+import { HorizontalFilterBar } from './HorizontalFilterBar';
 import { SearchPagination } from './SearchPagination';
 
 interface CanonicalDirectoryViewProps {
@@ -49,7 +48,6 @@ export function CanonicalDirectoryView({
 }: CanonicalDirectoryViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const totalResults = meta?.counts?.total_organic ?? hits.length;
   const sponsoredCount = meta?.counts?.sponsored_count ?? 0;
@@ -173,32 +171,23 @@ export function CanonicalDirectoryView({
         </p>
       </div>
 
-      {/* Main 2-column Layout */}
-      <div className="flex flex-col gap-6 lg:flex-row">
-        {/* Left Filter Sidebar */}
-        <SearchFilterSidebar
-          filtersData={filtersData}
-          currentParams={currentParams}
-          onFilterChange={handleFilterChange}
-          onResetFilters={handleResetFilters}
-          isMobileOpen={mobileFiltersOpen}
-          onCloseMobile={() => setMobileFiltersOpen(false)}
-          fixedCity={citySlug}
-          fixedCategory={categorySlug}
-          fixedLocality={localitySlug}
-        />
+      {/* Full-Width Horizontal Filter Bar */}
+      <HorizontalFilterBar
+        currentParams={currentParams}
+        filtersData={filtersData}
+        onFilterChange={handleFilterChange}
+        onResetFilters={handleResetFilters}
+        hasActiveFilters={hasActiveFilters}
+        totalResults={totalResults}
+        sponsoredCount={sponsoredCount}
+        fixedCategorySlug={categorySlug}
+        fixedLocalitySlug={localitySlug}
+        showSearchWithin={false}
+        locale={currentParams.locale === 'ta' ? 'ta' : 'en'}
+      />
 
-        {/* Right Listings Column */}
-        <div className="flex-1 min-w-0 space-y-4">
-          {/* Quick Filter Bar */}
-          <QuickFilterBar
-            currentParams={currentParams}
-            onFilterChange={handleFilterChange}
-            onResetFilters={handleResetFilters}
-            onOpenMobileFilters={() => setMobileFiltersOpen(true)}
-            hasActiveFilters={hasActiveFilters}
-            sortOptions={filtersData?.sort_options}
-          />
+      {/* Full-Width Business Results */}
+      <div className="mt-5 w-full space-y-4">
 
           {/* Results State */}
           {isPending ? (
@@ -289,7 +278,6 @@ export function CanonicalDirectoryView({
               </div>
             </div>
           )}
-        </div>
       </div>
     </div>
   );
