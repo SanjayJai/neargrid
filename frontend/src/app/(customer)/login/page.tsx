@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
-import {
-  OtpLoginForm,
-  sanitizeInternalRedirectPath,
-} from '@/modules/customer/components/OtpLoginForm';
+import { OtpLoginForm } from '@/modules/customer/components/OtpLoginForm';
+import { sanitizeInternalRedirectPath } from '@/modules/customer/lib/auth-redirect';
 
 export const metadata: Metadata = {
   title: 'Sign in with Mobile OTP',
@@ -10,15 +8,20 @@ export const metadata: Metadata = {
 };
 
 interface LoginPageProps {
-  searchParams?: {
-    next?: string | string[];
-  };
+  searchParams?:
+    | {
+        next?: string | string[];
+      }
+    | Promise<{
+        next?: string | string[];
+      }>;
 }
 
-export default function LoginPage({ searchParams }: LoginPageProps) {
-  const rawNext = Array.isArray(searchParams?.next)
-    ? searchParams?.next[0]
-    : searchParams?.next;
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+  const rawNext = Array.isArray(resolvedSearchParams?.next)
+    ? resolvedSearchParams?.next[0]
+    : resolvedSearchParams?.next;
   const redirectTo = sanitizeInternalRedirectPath(rawNext);
 
   return (
