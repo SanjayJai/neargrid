@@ -240,7 +240,7 @@ export function OtpLoginForm({ redirectTo }: OtpLoginFormProps) {
               autoComplete="one-time-code"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="123456"
+              placeholder="Enter 6-digit code"
               className="w-full rounded-xl border border-zinc-300 px-4 py-3 text-center text-lg font-semibold tracking-[0.4em] text-zinc-950 focus:border-zinc-950 focus:outline-none"
             />
           </div>

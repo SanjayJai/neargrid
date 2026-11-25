@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { getServerAuthenticatedUser } from '@/lib/bff/session-cookie';
 import { BusinessShell } from '@/modules/business/components/BusinessShell';
+import { MerchantAccessDenied } from '@/modules/business/components/MerchantAccessDenied';
 import { OwnerBusinessProvider } from '@/modules/business/context/OwnerBusinessContext';
+import { authorizeBusinessDashboardAccess } from '@/modules/business/lib/dashboard-access';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: {
@@ -13,11 +18,20 @@ export const metadata: Metadata = {
 };
 
 export default async function BusinessLayout({ children }: { children: ReactNode }) {
-  const user = await getServerAuthenticatedUser();
+  const requestedPath = headers().get('x-pathname') ?? '/dashboard';
+  const access = await authorizeBusinessDashboardAccess(requestedPath);
+
+  if (access.status === 'unauthenticated') {
+    redirect(access.redirectTo);
+  }
+
+  if (access.status === 'forbidden') {
+    return <MerchantAccessDenied user={access.user} />;
+  }
 
   return (
-    <OwnerBusinessProvider>
-      <BusinessShell user={user}>{children}</BusinessShell>
+    <OwnerBusinessProvider initialBusinesses={access.businesses}>
+      <BusinessShell user={access.user}>{children}</BusinessShell>
     </OwnerBusinessProvider>
   );
 }

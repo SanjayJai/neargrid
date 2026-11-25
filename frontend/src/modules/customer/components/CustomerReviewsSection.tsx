@@ -523,7 +523,7 @@ export function CustomerReviewsSection({
                     required
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
+                    placeholder="Enter 6-digit code"
                     className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-center text-lg font-mono tracking-widest text-ink focus:border-brand-primary focus:outline-none"
                   />
                 </div>

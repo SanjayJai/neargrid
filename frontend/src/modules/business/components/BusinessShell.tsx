@@ -37,7 +37,7 @@ const NAV_ITEMS = [
 ] as const;
 
 interface BusinessShellProps {
-  user: UserDto | null;
+  user: UserDto;
   children: ReactNode;
 }
 
@@ -119,17 +119,15 @@ export function BusinessShell({ user, children }: BusinessShellProps) {
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {user && (
-              <button
-                type="button"
-                onClick={() => setCreateModalOpen(true)}
-                className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-50 sm:px-3"
-              >
-                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                <span className="hidden sm:inline">Add Listing</span>
-                <span className="sm:hidden">New</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setCreateModalOpen(true)}
+              className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-800 hover:bg-zinc-50 sm:px-3"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="hidden sm:inline">Add Listing</span>
+              <span className="sm:hidden">New</span>
+            </button>
 
             <Link
               href="/"
@@ -139,30 +137,21 @@ export function BusinessShell({ user, children }: BusinessShellProps) {
               Customer Site
             </Link>
 
-            {user ? (
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <NotificationBellFlyout user={user} />
-                <span className="hidden text-xs font-medium text-zinc-700 md:inline">
-                  {user.name ?? user.phone_e164}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  disabled={loggingOut}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
-                >
-                  <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-                  {loggingOut ? 'Signing out...' : 'Sign out'}
-                </button>
-              </div>
-            ) : (
-              <Link
-                href="/login"
-                className="rounded-lg bg-zinc-950 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <NotificationBellFlyout user={user} />
+              <span className="hidden text-xs font-medium text-zinc-700 md:inline">
+                {user.name ?? user.phone_e164}
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
               >
-                Sign in with OTP
-              </Link>
-            )}
+                <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                {loggingOut ? 'Signing out...' : 'Sign out'}
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -229,13 +218,9 @@ export function BusinessShell({ user, children }: BusinessShellProps) {
           )}
 
           <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3.5 text-xs text-zinc-600">
-            <p className="font-semibold text-zinc-900">
-              {user ? 'Live BFF Session Active' : 'Unauthenticated Preview'}
-            </p>
+            <p className="font-semibold text-zinc-900">Live BFF Session Active</p>
             <p className="mt-1 leading-relaxed">
-              {user
-                ? 'All storefront actions connect live to Laravel 13 via Next.js BFF.'
-                : 'Sign in at /login with OTP to manage live business listings and team.'}
+              All storefront actions connect live to Laravel 13 via Next.js BFF.
             </p>
           </div>
         </aside>

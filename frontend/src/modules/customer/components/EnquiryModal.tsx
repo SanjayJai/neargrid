@@ -467,7 +467,7 @@ export function EnquiryModal({
                 required
                 maxLength={6}
                 autoFocus
-                placeholder="123456"
+                placeholder="Enter 6-digit code"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 className="mt-1 block w-full tracking-widest text-center font-mono text-lg rounded-lg border border-gray-300 py-2.5 text-ink placeholder:text-gray-300 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"

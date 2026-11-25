@@ -68,6 +68,12 @@ class AppServiceProvider extends ServiceProvider
                     "Production configuration violation: QUEUE_CONNECTION must be set to 'redis' (currently '{$queueConnection}'). Synchronous or database queue connections are not permitted in production."
                 );
             }
+
+            if ($this->app->make(OtpSender::class) instanceof NullOtpSender) {
+                throw new \RuntimeException(
+                    'Production configuration violation: NullOtpSender is not permitted in production. Configure a production OtpSender implementation.'
+                );
+            }
         }
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);

@@ -22,6 +22,10 @@ final class NullOtpSender implements OtpSender
         int $ttlSeconds,
         ?string $challengeId = null,
     ): void {
+        if (app()->isProduction()) {
+            throw new \RuntimeException('NullOtpSender cannot be used to deliver OTPs in production.');
+        }
+
         Log::info('OTP challenge dispatched via NullOtpSender', [
             'recipient_masked' => PhoneNormalizer::mask($phoneE164),
             'purpose' => $purpose->value,

@@ -233,4 +233,29 @@ final class ApiFoundationTest extends TestCase
 
         (new AppServiceProvider($this->app))->boot();
     }
+
+    public function test_production_otp_sender_cannot_be_null_sender(): void
+    {
+        $this->app->detectEnvironment(static fn () => 'production');
+        config([
+            'cache.default' => 'redis',
+            'queue.default' => 'redis',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Production configuration violation: NullOtpSender is not permitted in production.');
+
+        (new AppServiceProvider($this->app))->boot();
+    }
+
+    public function test_null_otp_sender_throws_in_production_without_logging_otp(): void
+    {
+        $this->app->detectEnvironment(static fn () => 'production');
+        $sender = new \App\Domains\Identity\Services\NullOtpSender;
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('NullOtpSender cannot be used to deliver OTPs in production.');
+
+        $sender->send('+919840012345', '654321', \App\Domains\Identity\Enums\OtpPurpose::Login, 300, 'chg_1');
+    }
 }
