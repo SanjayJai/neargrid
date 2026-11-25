@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Directory;
 
+use App\Domains\Domains\Services\DomainResolutionService;
 use App\Domains\Location\Models\City;
 use App\Domains\Location\Models\State;
 use App\Domains\Location\Services\LocationRedirectResolver;
@@ -22,6 +23,7 @@ final class ReferenceTaxonomyController extends Controller
     public function __construct(
         private readonly LocationRedirectResolver $locationRedirectResolver,
         private readonly CategoryTreeService $categoryTreeService,
+        private readonly DomainResolutionService $domainResolver,
     ) {}
 
     public function states(Request $request): JsonResponse
@@ -230,8 +232,9 @@ final class ReferenceTaxonomyController extends Controller
     public function categoryLanding(Request $request, string $path): JsonResponse
     {
         $locale = $this->normalizeLocale((string) $request->query('locale', 'en'));
+        $domain = $this->domainResolver->resolveFromRequest($request);
 
-        return ApiResponse::success($this->categoryTreeService->resolveLanding($path, $locale));
+        return ApiResponse::success($this->categoryTreeService->resolveLanding($path, $locale, $domain?->id));
     }
 
     public function attributes(): JsonResponse

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Account\SavedBusinessController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminCategoryCollectionController;
 use App\Http\Controllers\Api\V1\Admin\AdminCategoryController;
+use App\Http\Controllers\Api\V1\Admin\AdminDomainController;
 use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
 use App\Http\Controllers\Api\V1\Admin\AdminLocationController;
 use App\Http\Controllers\Api\V1\Admin\AdminReviewController;
@@ -16,8 +17,10 @@ use App\Http\Controllers\Api\V1\Auth\AccountController;
 use App\Http\Controllers\Api\V1\Auth\DeviceSessionController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
 use App\Http\Controllers\Api\V1\Directory\OwnerBusinessController;
+use App\Http\Controllers\Api\V1\Directory\OwnerOrganizationController;
 use App\Http\Controllers\Api\V1\Directory\OwnerReviewController;
 use App\Http\Controllers\Api\V1\Directory\PublicBusinessController;
+use App\Http\Controllers\Api\V1\Directory\PublicDomainController;
 use App\Http\Controllers\Api\V1\Directory\PublicReviewController;
 use App\Http\Controllers\Api\V1\Directory\ReferenceTaxonomyController;
 use App\Http\Controllers\Api\V1\Leads\OwnerLeadController;
@@ -43,6 +46,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         ->where('path', '.*')
         ->name('categories.landing');
     Route::get('/attributes', [ReferenceTaxonomyController::class, 'attributes'])->name('attributes.index');
+    Route::get('/public/domains/resolve', [PublicDomainController::class, 'resolve'])->name('public.domains.resolve');
 
     // Public business profiles (only status=active, privacy-safe resource)
     Route::get('/businesses/{citySlug}/{businessSlug}', [PublicBusinessController::class, 'show'])->name('businesses.show');
@@ -130,6 +134,24 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::post('/{business}/kyc-documents', [KycDocumentController::class, 'store'])->name('kyc-documents.store');
             Route::post('/{business}/kyc-documents/{kycDocument}/signed-url', [KycDocumentController::class, 'signedUrl'])->name('kyc-documents.signed-url');
             Route::delete('/{business}/kyc-documents/{kycDocument}', [KycDocumentController::class, 'destroy'])->name('kyc-documents.destroy');
+        });
+
+        // Organization & company-owned/franchise branch management endpoints
+        Route::prefix('owner/organizations')->name('owner.organizations.')->group(function (): void {
+            Route::get('/', [OwnerOrganizationController::class, 'index'])->name('index');
+            Route::post('/', [OwnerOrganizationController::class, 'store'])->name('store');
+            Route::get('/{organization}', [OwnerOrganizationController::class, 'show'])->name('show');
+            Route::match(['put', 'patch'], '/{organization}', [OwnerOrganizationController::class, 'update'])->name('update');
+
+            Route::get('/{organization}/members', [OwnerOrganizationController::class, 'indexMembers'])->name('members.index');
+            Route::post('/{organization}/members', [OwnerOrganizationController::class, 'upsertMember'])->name('members.upsert');
+
+            Route::get('/{organization}/branches', [OwnerOrganizationController::class, 'indexBranches'])->name('branches.index');
+            Route::post('/{organization}/branches', [OwnerOrganizationController::class, 'attachBranch'])->name('branches.attach');
+            Route::post('/{organization}/branches/{business}/hq-lead-access', [OwnerOrganizationController::class, 'updateFranchiseHqLeadAccess'])
+                ->name('branches.hq-lead-access');
+
+            Route::get('/{organization}/leads', [OwnerOrganizationController::class, 'indexLeads'])->name('leads.index');
         });
 
         // Customer enquiry transparency portal
@@ -226,6 +248,19 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                 Route::get('/{entityType}/{entityIdentifier}', [AdminSeoController::class, 'show'])->name('show');
                 Route::put('/{entityType}/{entityIdentifier}', [AdminSeoController::class, 'upsert'])->name('upsert');
                 Route::post('/metadata/{seoMetadata}/rollback/{revision}', [AdminSeoController::class, 'rollback'])->name('rollback');
+            });
+
+            Route::prefix('domains')->name('domains.')->group(function (): void {
+                Route::get('/', [AdminDomainController::class, 'index'])->name('index');
+                Route::post('/', [AdminDomainController::class, 'store'])->name('store');
+                Route::get('/{domain}', [AdminDomainController::class, 'show'])->name('show');
+                Route::match(['put', 'patch'], '/{domain}', [AdminDomainController::class, 'update'])->name('update');
+                Route::post('/{domain}/challenge', [AdminDomainController::class, 'issueChallenge'])->name('challenge');
+                Route::post('/{domain}/verify', [AdminDomainController::class, 'verify'])->name('verify');
+                Route::post('/{domain}/ssl', [AdminDomainController::class, 'checkSsl'])->name('ssl');
+                Route::post('/{domain}/promote-primary', [AdminDomainController::class, 'promotePrimary'])->name('promote-primary');
+                Route::post('/{domain}/suspend', [AdminDomainController::class, 'suspend'])->name('suspend');
+                Route::delete('/{domain}', [AdminDomainController::class, 'destroy'])->name('destroy');
             });
         });
 

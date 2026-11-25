@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Leads;
 
 use App\Domains\Directory\Models\Business;
+use App\Domains\Domains\Services\DomainResolutionService;
 use App\Domains\Leads\Models\Enquiry;
 use App\Domains\Leads\Services\EnquiryManagementService;
 use App\Http\Controllers\Controller;
@@ -20,14 +21,25 @@ final class PublicEnquiryController extends Controller
 {
     public function __construct(
         private readonly EnquiryManagementService $enquiryService,
+        private readonly DomainResolutionService $domainResolver,
     ) {}
 
     public function store(StoreEnquiryRequest $request): JsonResponse
     {
+        $resolvedDomain = $this->domainResolver->resolveFromRequest($request);
+        $normalizedHost = $resolvedDomain?->hostname
+            ?? $this->domainResolver->normalizeSafeHost($request->getHost());
+        $rawEntry = $request->header('X-Entry-Path') ?? $request->headers->get('referer');
+
         $result = $this->enquiryService->createEnquiry(
             $request->validated(),
             $request->user('sanctum'),
-            $request->ip()
+            $request->ip(),
+            [
+                'source_domain_id' => $resolvedDomain?->id,
+                'source_host' => $normalizedHost,
+                'entry_path' => $this->domainResolver->normalizeEntryPath(is_string($rawEntry) ? $rawEntry : null),
+            ],
         );
 
         if ($result['requires_otp']) {

@@ -114,7 +114,7 @@ final class CategoryTreeService
      *
      * @return array<string, mixed>
      */
-    public function resolveLanding(string $slugPath, string $locale = 'en'): array
+    public function resolveLanding(string $slugPath, string $locale = 'en', ?int $domainId = null): array
     {
         $cleanLocale = in_array($locale, self::SUPPORTED_LOCALES, true) ? $locale : 'en';
         $segments = array_values(array_filter(explode('/', trim($slugPath, '/'))));
@@ -133,7 +133,7 @@ final class CategoryTreeService
                 ->first();
 
             if ($collection === null) {
-                $redirectTarget = $this->redirects->resolvePath($fullPath);
+                $redirectTarget = $this->redirects->resolvePath($fullPath, $domainId);
                 if ($redirectTarget !== null) {
                     return ['redirect' => true, 'http_status' => 301, 'target_path' => $redirectTarget];
                 }
@@ -152,7 +152,7 @@ final class CategoryTreeService
                     'name' => $collection->translatedName($cleanLocale),
                     'description' => $cleanLocale === 'ta' && $collection->description_ta ? $collection->description_ta : $collection->description_en,
                 ],
-                'seo' => $this->seoResolver->resolveCategoryOrCollection($collection, $cleanLocale, $canonicalPath),
+                'seo' => $this->seoResolver->resolveCategoryOrCollection($collection, $cleanLocale, $canonicalPath, [], $domainId),
             ];
         }
 
@@ -165,7 +165,7 @@ final class CategoryTreeService
             ->first();
 
         if ($category === null) {
-            $redirectTarget = $this->redirects->resolvePath($fullPath) ?? $this->redirects->resolvePath("/c/{$leafSlug}");
+            $redirectTarget = $this->redirects->resolvePath($fullPath, $domainId) ?? $this->redirects->resolvePath("/c/{$leafSlug}", $domainId);
             if ($redirectTarget !== null) {
                 return ['redirect' => true, 'http_status' => 301, 'target_path' => $redirectTarget];
             }
@@ -201,7 +201,7 @@ final class CategoryTreeService
                 ])->values()->all(),
             ],
             'breadcrumbs' => $breadcrumbs,
-            'seo' => $this->seoResolver->resolveCategoryOrCollection($category, $cleanLocale, $canonicalPath, $breadcrumbs),
+            'seo' => $this->seoResolver->resolveCategoryOrCollection($category, $cleanLocale, $canonicalPath, $breadcrumbs, $domainId),
         ];
     }
 

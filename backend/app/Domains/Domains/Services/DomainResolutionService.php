@@ -6,6 +6,7 @@ namespace App\Domains\Domains\Services;
 
 use App\Domains\Domains\Exceptions\DomainException;
 use App\Domains\Domains\Models\Domain;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 
@@ -67,6 +68,43 @@ final class DomainResolutionService
             ->where('status', 'active')
             ->where('verification_status', 'verified')
             ->first();
+    }
+
+    public function resolveFromRequest(Request $request): ?Domain
+    {
+        return $this->resolveActiveDomain($request->getHost());
+    }
+
+    public function normalizeSafeHost(?string $rawHost): ?string
+    {
+        if ($rawHost === null || trim($rawHost) === '') {
+            return null;
+        }
+
+        try {
+            return $this->normalizeHostname($rawHost);
+        } catch (DomainException) {
+            return null;
+        }
+    }
+
+    public function normalizeEntryPath(?string $rawPath): ?string
+    {
+        if ($rawPath === null || trim($rawPath) === '') {
+            return null;
+        }
+
+        $parsedPath = parse_url(trim($rawPath), PHP_URL_PATH);
+        if (! is_string($parsedPath) || $parsedPath === '') {
+            return null;
+        }
+
+        $clean = '/' . ltrim($parsedPath, '/');
+        if (str_contains($clean, '..') || preg_match('/[\x00-\x1F\x7F]/', $clean) === 1) {
+            return null;
+        }
+
+        return mb_substr($clean, 0, 500);
     }
 
     public function resolvePrimaryDomain(): ?Domain

@@ -38,6 +38,7 @@ final class EnquiryManagementService
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  array{source_domain_id?: ?int, source_host?: ?string, entry_path?: ?string}  $attribution
      * @return array{
      *   enquiry: Enquiry,
      *   requires_otp: bool,
@@ -46,7 +47,7 @@ final class EnquiryManagementService
      *   resend_after_seconds?: int
      * }
      */
-    public function createEnquiry(array $data, ?User $actor, string $ipAddress): array
+    public function createEnquiry(array $data, ?User $actor, string $ipAddress, array $attribution = []): array
     {
         $phoneE164 = PhoneNormalizer::normalizeAndValidate((string) $data['phone_e164']);
         $ipHash = hash('sha256', $ipAddress.config('app.key'));
@@ -102,13 +103,21 @@ final class EnquiryManagementService
 
         $isAuthenticated = $actor !== null;
 
+        $sourceDomainId = isset($attribution['source_domain_id']) ? (int) $attribution['source_domain_id'] : null;
+        $sourceHost = isset($attribution['source_host']) && is_string($attribution['source_host'])
+            ? $attribution['source_host']
+            : null;
+        $entryPath = isset($attribution['entry_path']) && is_string($attribution['entry_path'])
+            ? $attribution['entry_path']
+            : null;
+
         if ($isAuthenticated) {
             $enquiry = DB::transaction(function () use (
                 $actor, $targetBusiness, $category, $city, $locality,
                 $data, $phoneE164, $urgency, $enquiryType, $consentVersion,
-                $consentText, $ipHash
+                $consentText, $ipHash, $sourceDomainId, $sourceHost, $entryPath
             ): Enquiry {
-                $enquiry = Enquiry::query()->create([
+                $enquiry = new Enquiry([
                     'user_id' => $actor->id,
                     'target_business_id' => $targetBusiness?->id,
                     'category_id' => $category->id,
@@ -129,6 +138,10 @@ final class EnquiryManagementService
                     'ip_address_hash' => $ipHash,
                     'phone_verified_at' => now(),
                 ]);
+                $enquiry->source_domain_id = $sourceDomainId;
+                $enquiry->source_host = $sourceHost;
+                $enquiry->entry_path = $entryPath;
+                $enquiry->save();
 
                 return $enquiry;
             });
@@ -156,7 +169,7 @@ final class EnquiryManagementService
             $ipAddress
         );
 
-        $enquiry = Enquiry::query()->create([
+        $enquiry = new Enquiry([
             'user_id' => null,
             'target_business_id' => $targetBusiness?->id,
             'category_id' => $category->id,
@@ -177,6 +190,10 @@ final class EnquiryManagementService
             'ip_address_hash' => $ipHash,
             'otp_challenge_id' => $challenge['challenge_id'],
         ]);
+        $enquiry->source_domain_id = $sourceDomainId;
+        $enquiry->source_host = $sourceHost;
+        $enquiry->entry_path = $entryPath;
+        $enquiry->save();
 
         $this->hitRateLimits($phoneE164, $ipHash);
 

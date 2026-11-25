@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 final class DomainVerificationService
 {
     private const CHALLENGE_TTL_HOURS = 72;
+    public const MAX_VERIFICATION_ATTEMPTS = 10;
 
     public function __construct(
         private readonly AuditLogger $auditLogger,
@@ -34,6 +35,7 @@ final class DomainVerificationService
             $locked->challenge_hash = $hash;
             $locked->challenge_expires_at = now()->addHours(self::CHALLENGE_TTL_HOURS);
             $locked->challenge_consumed_at = null;
+            $locked->verification_attempts = 0;
             $locked->verification_status = 'pending';
             if ($locked->status === 'draft') {
                 $locked->status = 'pending_verification';
@@ -87,6 +89,17 @@ final class DomainVerificationService
                     'ok' => false,
                     'code' => 'CHALLENGE_EXPIRED',
                     'message' => 'Domain verification challenge has expired.',
+                ];
+            }
+
+            if ((int) $locked->verification_attempts >= self::MAX_VERIFICATION_ATTEMPTS) {
+                $locked->verification_status = 'failed';
+                $locked->save();
+
+                return [
+                    'ok' => false,
+                    'code' => 'CHALLENGE_ATTEMPTS_EXCEEDED',
+                    'message' => 'Maximum verification attempts exceeded. Issue a new challenge.',
                 ];
             }
 

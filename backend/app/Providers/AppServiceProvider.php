@@ -8,6 +8,10 @@ use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Directory\Models\BusinessService;
 use App\Domains\Directory\Models\BusinessVerification;
+use App\Domains\Directory\Models\Organization;
+use App\Domains\Domains\Contracts\DomainChallengeProber;
+use App\Domains\Domains\Models\Domain;
+use App\Domains\Domains\Services\NativeDomainChallengeProber;
 use App\Domains\Governance\Models\AuditLog;
 use App\Domains\Identity\Contracts\OtpSender;
 use App\Domains\Identity\Models\PersonalAccessToken;
@@ -33,9 +37,11 @@ use App\Policies\BusinessPolicy;
 use App\Policies\BusinessServicePolicy;
 use App\Policies\BusinessVerificationPolicy;
 use App\Policies\CategoryPolicy;
+use App\Policies\DomainPolicy;
 use App\Policies\EnquiryPolicy;
 use App\Policies\KycDocumentPolicy;
 use App\Policies\LocationPolicy;
+use App\Policies\OrganizationAccessPolicy;
 use App\Policies\PersonalAccessTokenPolicy;
 use App\Policies\UserDevicePolicy;
 use App\Policies\UserPolicy;
@@ -53,6 +59,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(OtpSender::class, NullOtpSender::class);
         $this->app->bind(SearchEngineInterface::class, MysqlSearchEngine::class);
+        $this->app->bind(DomainChallengeProber::class, NativeDomainChallengeProber::class);
         $this->app->bind(DatabaseChannel::class, CustomDatabaseChannel::class);
     }
 
@@ -99,6 +106,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Category::class, CategoryPolicy::class);
         Gate::policy(CategoryCollection::class, CategoryPolicy::class);
         Gate::policy(SeoMetadata::class, CategoryPolicy::class);
+        Gate::policy(Domain::class, DomainPolicy::class);
+        Gate::policy(Organization::class, OrganizationAccessPolicy::class);
 
         RateLimiter::for('search', static function (Request $request): Limit {
             $perMinute = max(10, (int) config('search.rate_limit_per_minute', 120));
