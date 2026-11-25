@@ -1,10 +1,15 @@
 import { callLaravelApi } from '@/lib/bff/laravel-client';
-import { bffError, forwardLaravelJson } from '@/lib/bff/route-helpers';
+import { bffError, extractBffTrustedHost, forwardLaravelJson } from '@/lib/bff/route-helpers';
 import type { CategoryLandingResponseDto } from '@/shared/api/directory-types';
 
 const SLUG_SEGMENT_RE = /^[a-z0-9-]+$/;
 
 export async function GET(request: Request) {
+  const trustedHost = extractBffTrustedHost(request);
+  if (!trustedHost) {
+    return bffError('INVALID_HOST', 'Invalid request host.', 400);
+  }
+
   const url = new URL(request.url);
   const rawPath = (url.searchParams.get('path') ?? '').trim().replace(/^\/+|\/+$/g, '');
   const segments = rawPath ? rawPath.split('/') : [];
@@ -26,6 +31,7 @@ export async function GET(request: Request) {
       {
         method: 'GET',
         requestId: request.headers.get('x-request-id'),
+        requestHost: trustedHost,
       }
     );
     return forwardLaravelJson(result, undefined, { forwardCacheHeaders: true });

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { extractTrustedRequestHost, normalizeRequestHostname } from '@/lib/domains/host-resolver';
 import { validateOriginAndCsrf } from './csrf';
 import { LaravelCallResult } from './laravel-client';
 import { clearOpaqueSessionCookie, readCurrentServerSession } from './session-cookie';
@@ -18,6 +19,63 @@ export function isValidNotificationId(value: string): boolean {
 
 export function isValidSlug(value: string): boolean {
   return value.length >= 1 && value.length <= 140 && SAFE_SLUG_REGEX.test(value);
+}
+
+/**
+ * Extracts validated request host for BFF routes, ignoring spoofed
+ * X-Forwarded-Host / X-NearGrid-Host headers from browsers.
+ */
+export function extractBffTrustedHost(request: Request): string | null {
+  const rawHeaderHost = request.headers.get('host');
+  if (rawHeaderHost !== null) {
+    return extractTrustedRequestHost(request.headers);
+  }
+
+  try {
+    return normalizeRequestHostname(new URL(request.url).host);
+  } catch {
+    return null;
+  }
+}
+
+const UNTRUSTED_DOMAIN_KEYS = new Set([
+  'domain_id',
+  'source_domain_id',
+  'source_host',
+  'entry_path',
+]);
+
+export function stripUntrustedDomainFields(body: unknown): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return body;
+  }
+
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body as Record<string, unknown>)) {
+    if (!UNTRUSTED_DOMAIN_KEYS.has(key)) {
+      clean[key] = value;
+    }
+  }
+  return clean;
+}
+
+export function extractSafeEntryPath(request: Request): string | null {
+  const referer = request.headers.get('referer');
+  if (!referer) return null;
+  try {
+    const parsed = new URL(referer);
+    const trustedHost = extractBffTrustedHost(request);
+    if (trustedHost && normalizeRequestHostname(parsed.host) !== trustedHost) {
+      return null;
+    }
+    const clean = parsed.pathname;
+    if (!clean.startsWith('/') || clean.includes('..')) {
+      return null;
+    }
+    return clean.slice(0, 500);
+  } catch {
+    return null;
+  }
 }
 
 export function bffError(

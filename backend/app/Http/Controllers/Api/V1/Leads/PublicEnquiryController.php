@@ -27,9 +27,13 @@ final class PublicEnquiryController extends Controller
     public function store(StoreEnquiryRequest $request): JsonResponse
     {
         $resolvedDomain = $this->domainResolver->resolveFromRequest($request);
+        $effectiveHost = $this->domainResolver->resolveEffectiveHost($request);
         $normalizedHost = $resolvedDomain?->hostname
-            ?? $this->domainResolver->normalizeSafeHost($request->getHost());
-        $rawEntry = $request->header('X-Entry-Path') ?? $request->headers->get('referer');
+            ?? $this->domainResolver->normalizeSafeHost($effectiveHost);
+
+        $rawEntry = $this->domainResolver->isTrustedBffRequest($request)
+            ? ($request->header('X-Entry-Path') ?? $request->headers->get('referer'))
+            : $request->headers->get('referer');
 
         $result = $this->enquiryService->createEnquiry(
             $request->validated(),

@@ -56,6 +56,50 @@ export interface ReferenceCategoryDto extends ReferenceCategoryChildDto {
 }
 
 // ---------------------------------------------------------------------------
+// M-A2 Multi-Domain Resolution DTO (PublicDomainController)
+// ---------------------------------------------------------------------------
+
+export interface PublicResolvedDomainDto {
+  public_id: string;
+  hostname: string;
+  domain_type: 'primary' | 'city_portal' | 'brand_microsite';
+  is_primary: boolean;
+  visibility_mode: 'global' | 'location_scoped' | 'organization_scoped';
+  default_locale: 'en' | 'ta';
+  default_city: {
+    public_id: string;
+    slug: string;
+    name: string;
+  } | null;
+  default_state: {
+    public_id: string;
+    slug: string;
+    name: string;
+  } | null;
+  canonical_origin: string;
+  is_canonical_for_location: boolean;
+  is_indexable: boolean;
+}
+
+export interface OwnerOrganizationDto {
+  public_id: string;
+  name: string;
+  slug: string;
+  status: 'active' | 'suspended';
+  created_at: string | null;
+}
+
+export interface OwnerOrganizationBranchDto {
+  public_id: string;
+  name: string;
+  slug: string;
+  city_slug: string | null;
+  branch_type: 'independent' | 'headquarters' | 'company_owned' | 'franchise';
+  franchise_code: string | null;
+  allow_hq_lead_access: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // M-A1 Category Engine & Global SEO DTOs
 // ---------------------------------------------------------------------------
 

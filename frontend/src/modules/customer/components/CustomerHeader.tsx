@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import type { UserDto } from '@/lib/bff/types';
 import { bffFetch } from '@/shared/api/bff-client';
-import type { ReferenceCityDto } from '@/shared/api/directory-types';
+import type { PublicResolvedDomainDto, ReferenceCityDto } from '@/shared/api/directory-types';
 import { NearGridLogo } from '@/shared/ui/NearGridLogo';
 import { NotificationBellFlyout } from '@/modules/customer/components/NotificationBellFlyout';
 import {
@@ -32,9 +32,10 @@ import {
 interface CustomerHeaderProps {
   user: UserDto | null;
   cities: ReferenceCityDto[];
+  activeDomain?: PublicResolvedDomainDto | null;
 }
 
-export function CustomerHeader({ user, cities }: CustomerHeaderProps) {
+export function CustomerHeader({ user, cities, activeDomain = null }: CustomerHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -42,7 +43,7 @@ export function CustomerHeader({ user, cities }: CustomerHeaderProps) {
 
   const locale: SupportedLocale = normalizeLocale(searchParams.get('locale'));
   const urlCitySlug = sanitizeSlug(searchParams.get('city'));
-  const defaultCity = cities[0]?.slug ?? 'chennai';
+  const defaultCity = activeDomain?.default_city?.slug ?? cities[0]?.slug ?? 'chennai';
   const activeCitySlug =
     (urlCitySlug && cities.some((c) => c.slug === urlCitySlug) ? urlCitySlug : null) ??
     urlCitySlug ??

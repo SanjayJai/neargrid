@@ -4,6 +4,7 @@ import type {
   CategoryLandingResponseDto,
   CategoryTreeResponseDto,
   PublicBusinessProfileDto,
+  PublicResolvedDomainDto,
   ReferenceAttributesDto,
   ReferenceCategoryDto,
   ReferenceCityDto,
@@ -202,6 +203,15 @@ export async function fetchPublicCategoryLanding(
 
 export async function fetchPublicAttributes(): Promise<PublicApiResult<ReferenceAttributesDto>> {
   return safePublicGet<ReferenceAttributesDto>('/api/v1/attributes', 300);
+}
+
+export async function fetchPublicResolvedDomain(
+  host: string
+): Promise<PublicApiResult<PublicResolvedDomainDto>> {
+  return safePublicGet<PublicResolvedDomainDto>(
+    `/api/v1/public/domains/resolve?host=${encodeURIComponent(host)}`,
+    60
+  );
 }
 
 export async function fetchPublicBusinessProfile(

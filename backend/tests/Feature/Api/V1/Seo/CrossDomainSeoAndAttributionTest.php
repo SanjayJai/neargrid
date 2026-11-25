@@ -64,13 +64,54 @@ final class CrossDomainSeoAndAttributionTest extends TestCase
             'source_host' => 'evil.example.com',
             'entry_path' => '/../../etc/passwd',
         ], [
-            'X-Entry-Path' => '/c/healthcare/dentists?utm_source=test',
+            'Referer' => 'https://vellore.neargrid.in/c/healthcare/dentists?utm_source=test',
         ])->assertStatus(201);
 
         $enquiry = Enquiry::query()->where('public_id', $res->json('data.public_id'))->firstOrFail();
         $this->assertSame($velloreDomain->id, $enquiry->source_domain_id);
         $this->assertSame('vellore.neargrid.in', $enquiry->source_host);
         $this->assertSame('/c/healthcare/dentists', $enquiry->entry_path);
+
+        // Direct public caller spoofing X-NearGrid-Host / X-Entry-Path WITHOUT BFF secret is ignored
+        $spoofedRes = $this->postJson('http://127.0.0.1/api/v1/enquiries', [
+            'category_slug' => $category->slug,
+            'city_slug' => $city->slug,
+            'customer_name' => 'Spoofer',
+            'phone_e164' => '+919840012347',
+            'requirement' => 'Direct public spoofed headers',
+            'consent_given' => true,
+            'consent_version' => '2026.1',
+        ], [
+            'X-NearGrid-Host' => 'vellore.neargrid.in',
+            'X-NearGrid-Bff-Secret' => 'wrong-secret',
+            'X-Entry-Path' => '/c/spoofed',
+        ])->assertStatus(201);
+
+        $spoofedEnquiry = Enquiry::query()->where('public_id', $spoofedRes->json('data.public_id'))->firstOrFail();
+        $this->assertNull($spoofedEnquiry->source_domain_id);
+        $this->assertSame('127.0.0.1', $spoofedEnquiry->source_host);
+        $this->assertNull($spoofedEnquiry->entry_path);
+
+        // Authenticated BFF request WITH matching BFF secret resolves X-NearGrid-Host and X-Entry-Path
+        config()->set('app.bff_internal_secret', 'test-bff-shared-secret-xyz');
+        $bffRes = $this->postJson('http://127.0.0.1/api/v1/enquiries', [
+            'category_slug' => $category->slug,
+            'city_slug' => $city->slug,
+            'customer_name' => 'Trusted BFF Customer',
+            'phone_e164' => '+919840012348',
+            'requirement' => 'Trusted BFF forwarded host test',
+            'consent_given' => true,
+            'consent_version' => '2026.1',
+        ], [
+            'X-NearGrid-Host' => 'vellore.neargrid.in',
+            'X-NearGrid-Bff-Secret' => 'test-bff-shared-secret-xyz',
+            'X-Entry-Path' => '/c/healthcare/dentists',
+        ])->assertStatus(201);
+
+        $bffEnquiry = Enquiry::query()->where('public_id', $bffRes->json('data.public_id'))->firstOrFail();
+        $this->assertSame($velloreDomain->id, $bffEnquiry->source_domain_id);
+        $this->assertSame('vellore.neargrid.in', $bffEnquiry->source_host);
+        $this->assertSame('/c/healthcare/dentists', $bffEnquiry->entry_path);
 
         // Path traversal in X-Entry-Path is rejected/sanitized to null
         $res2 = $this->postJson('https://vellore.neargrid.in/api/v1/enquiries', [
@@ -82,6 +123,7 @@ final class CrossDomainSeoAndAttributionTest extends TestCase
             'consent_given' => true,
             'consent_version' => '2026.1',
         ], [
+            'X-NearGrid-Bff-Secret' => 'test-bff-shared-secret-xyz',
             'X-Entry-Path' => '/../../etc/passwd',
         ])->assertStatus(201);
 

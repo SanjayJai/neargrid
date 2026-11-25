@@ -1,3 +1,4 @@
+import { extractTrustedRequestHost, normalizeRequestHostname } from '@/lib/domains/host-resolver';
 import { ApiEnvelope } from './types';
 
 export interface LaravelCallOptions {
@@ -5,6 +6,8 @@ export interface LaravelCallOptions {
   body?: unknown;
   bearerToken?: string;
   requestId?: string | null;
+  requestHost?: string | null;
+  entryPath?: string | null;
   signal?: AbortSignal;
   revalidateSeconds?: number;
   timeoutMs?: number;
@@ -35,6 +38,20 @@ export function getLaravelApiBaseUrl(): string {
   return (process.env.API_BASE_URL ?? 'http://127.0.0.1:8000').replace(/\/+$/, '');
 }
 
+async function resolveInternalForwardedHost(explicitHost?: string | null): Promise<string | null> {
+  if (explicitHost !== undefined) {
+    return normalizeRequestHostname(explicitHost);
+  }
+
+  try {
+    const { headers } = await import('next/headers');
+    const headerBag = await Promise.resolve(headers());
+    return extractTrustedRequestHost(headerBag);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Server-only HTTP client for Laravel 13 /api/v1/* JSON endpoints.
  * Attaches Sanctum Bearer tokens exclusively on the server side.
@@ -61,6 +78,20 @@ export async function callLaravelApi<T>(
 
   if (options.requestId) {
     headers['X-Request-ID'] = options.requestId;
+  }
+
+  const forwardedHost = await resolveInternalForwardedHost(options.requestHost);
+  if (forwardedHost) {
+    headers['X-NearGrid-Host'] = forwardedHost;
+  }
+
+  const bffInternalSecret = process.env.BFF_INTERNAL_SECRET;
+  if (bffInternalSecret) {
+    headers['X-NearGrid-Bff-Secret'] = bffInternalSecret;
+  }
+
+  if (options.entryPath && options.entryPath.startsWith('/') && !options.entryPath.includes('..')) {
+    headers['X-Entry-Path'] = options.entryPath;
   }
 
   const timeoutMs = options.timeoutMs ?? 8000;
@@ -129,6 +160,7 @@ export async function callLaravelMultipartApi<T>(
   options: {
     bearerToken: string;
     requestId?: string | null;
+    requestHost?: string | null;
   }
 ): Promise<LaravelCallResult<T>> {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -142,6 +174,16 @@ export async function callLaravelMultipartApi<T>(
 
   if (options.requestId) {
     headers['X-Request-ID'] = options.requestId;
+  }
+
+  const forwardedHost = await resolveInternalForwardedHost(options.requestHost);
+  if (forwardedHost) {
+    headers['X-NearGrid-Host'] = forwardedHost;
+  }
+
+  const bffInternalSecret = process.env.BFF_INTERNAL_SECRET;
+  if (bffInternalSecret) {
+    headers['X-NearGrid-Bff-Secret'] = bffInternalSecret;
   }
 
   const response = await fetch(url, {

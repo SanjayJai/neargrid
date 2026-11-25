@@ -70,9 +70,31 @@ final class DomainResolutionService
             ->first();
     }
 
+    public function isTrustedBffRequest(Request $request): bool
+    {
+        $configuredSecret = (string) config('app.bff_internal_secret', env('BFF_INTERNAL_SECRET', ''));
+        $presentedSecret = (string) $request->header('X-NearGrid-Bff-Secret', '');
+
+        return $configuredSecret !== ''
+            && $presentedSecret !== ''
+            && hash_equals($configuredSecret, $presentedSecret);
+    }
+
+    public function resolveEffectiveHost(Request $request): string
+    {
+        if ($this->isTrustedBffRequest($request)) {
+            $forwarded = $request->header('X-NearGrid-Host');
+            if (is_string($forwarded) && trim($forwarded) !== '') {
+                return $forwarded;
+            }
+        }
+
+        return $request->getHost();
+    }
+
     public function resolveFromRequest(Request $request): ?Domain
     {
-        return $this->resolveActiveDomain($request->getHost());
+        return $this->resolveActiveDomain($this->resolveEffectiveHost($request));
     }
 
     public function normalizeSafeHost(?string $rawHost): ?string

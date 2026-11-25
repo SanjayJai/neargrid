@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { extractTrustedRequestHost, normalizeRequestHostname } from '@/lib/domains/host-resolver';
 
 export const CSRF_COOKIE_NAME = 'lbd_csrf';
 export const CSRF_HEADER_NAME = 'x-csrf-token';
@@ -32,10 +33,39 @@ function allowedOriginsForRequest(request: Request): Set<string> {
     allowed.add(siteUrlOrigin);
   }
 
-  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+  const rawHostHeader = request.headers.get('host');
+  const trustedHostName = rawHostHeader !== null
+    ? extractTrustedRequestHost(request.headers)
+    : (() => {
+        try {
+          return normalizeRequestHostname(new URL(request.url).host);
+        } catch {
+          return null;
+        }
+      })();
+
+  let hostWithPort: string | null = trustedHostName;
+  if (trustedHostName) {
+    // Preserve validated port (e.g. :3000 in http://localhost:3000) so Origin matches port-bound origins.
+    const sourceHost = rawHostHeader ?? (() => {
+      try {
+        return new URL(request.url).host;
+      } catch {
+        return '';
+      }
+    })();
+    const portMatch = sourceHost.trim().match(/:(\d{1,5})$/);
+    if (portMatch && !trustedHostName.includes(':')) {
+      const port = Number(portMatch[1]);
+      if (port >= 1 && port <= 65535) {
+        hostWithPort = `${trustedHostName}:${port}`;
+      }
+    }
+  }
+
   const proto = request.headers.get('x-forwarded-proto') ?? (process.env.NODE_ENV === 'production' ? 'https' : 'http');
-  if (host) {
-    const derived = parseOrigin(`${proto}://${host}`);
+  if (hostWithPort) {
+    const derived = parseOrigin(`${proto}://${hostWithPort}`);
     if (derived) {
       allowed.add(derived);
     }

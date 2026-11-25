@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server';
 import { callLaravelApi } from '@/lib/bff/laravel-client';
-import { bffError, enforceMutationSecurity, forwardLaravelJson, parseJsonBody } from '@/lib/bff/route-helpers';
+import {
+  bffError,
+  enforceMutationSecurity,
+  extractBffTrustedHost,
+  extractSafeEntryPath,
+  forwardLaravelJson,
+  parseJsonBody,
+  stripUntrustedDomainFields,
+} from '@/lib/bff/route-helpers';
 import { readCurrentServerSession } from '@/lib/bff/session-cookie';
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const trustedHost = extractBffTrustedHost(request);
+  if (!trustedHost) {
+    return bffError('INVALID_HOST', 'Invalid request host.', 400);
+  }
+
   const securityError = enforceMutationSecurity(request);
   if (securityError) return securityError;
 
@@ -18,9 +31,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const result = await callLaravelApi('/api/v1/enquiries', {
       method: 'POST',
-      body: parsed.data,
+      body: stripUntrustedDomainFields(parsed.data),
       bearerToken,
       requestId: request.headers.get('x-request-id'),
+      requestHost: trustedHost,
+      entryPath: extractSafeEntryPath(request),
     });
 
     return forwardLaravelJson(result, opaqueId);

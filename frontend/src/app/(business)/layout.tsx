@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { getServerDomainContext } from '@/lib/domains/host-resolver';
 import { BusinessShell } from '@/modules/business/components/BusinessShell';
 import { MerchantAccessDenied } from '@/modules/business/components/MerchantAccessDenied';
 import { OwnerBusinessProvider } from '@/modules/business/context/OwnerBusinessContext';
@@ -18,6 +19,11 @@ export const metadata: Metadata = {
 };
 
 export default async function BusinessLayout({ children }: { children: ReactNode }) {
+  const domainContext = await getServerDomainContext();
+  if (domainContext.kind === 'unregistered_or_blocked' || domainContext.kind === 'invalid') {
+    notFound();
+  }
+
   const requestedPath = headers().get('x-pathname') ?? '/dashboard';
   const access = await authorizeBusinessDashboardAccess(requestedPath);
 

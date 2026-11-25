@@ -6,7 +6,6 @@ import { useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
   Building2,
-  ChevronDown,
   Clock,
   Images,
   Inbox,
@@ -22,6 +21,7 @@ import {
 import type { UserDto } from '@/lib/bff/types';
 import { bffFetch } from '@/shared/api/bff-client';
 import { useOwnerBusiness } from '@/modules/business/context/OwnerBusinessContext';
+import { BranchSwitcher } from '@/modules/business/components/BranchSwitcher';
 import { CreateBusinessModal } from '@/modules/business/components/CreateBusinessModal';
 import { NotificationBellFlyout } from '@/modules/customer/components/NotificationBellFlyout';
 
@@ -93,29 +93,8 @@ export function BusinessShell({ user, children }: BusinessShellProps) {
               </div>
             </Link>
 
-            {/* Active business selector (if user has listings) */}
-            {businesses.length > 0 && (
-              <div className="ml-4 hidden items-center gap-2 lg:flex">
-                <div className="relative">
-                  <select
-                    value={activeBusinessId ?? ''}
-                    onChange={(e) => setActiveBusinessId(e.target.value)}
-                    aria-label="Switch active business listing"
-                    className="h-8 cursor-pointer appearance-none rounded-lg border border-zinc-200 bg-zinc-50 pl-2.5 pr-7 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 focus:border-zinc-950 focus:outline-none"
-                  >
-                    {businesses.map((biz) => (
-                      <option key={biz.public_id} value={biz.public_id}>
-                        {biz.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    className="pointer-events-none absolute right-2 top-2.5 h-3.5 w-3.5 text-zinc-400"
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-            )}
+            {/* Responsive organization & branch switcher */}
+            <BranchSwitcher />
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3">
