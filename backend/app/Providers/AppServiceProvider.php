@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domains\Advertising\Models\AdCampaign;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\BusinessMember;
 use App\Domains\Directory\Models\BusinessService;
@@ -30,6 +31,7 @@ use App\Domains\Seo\Models\SeoMetadata;
 use App\Domains\Taxonomy\Models\Category;
 use App\Domains\Taxonomy\Models\CategoryCollection;
 use App\Models\User;
+use App\Policies\AdCampaignPolicy;
 use App\Policies\AuditLogPolicy;
 use App\Policies\BusinessMediaPolicy;
 use App\Policies\BusinessMemberPolicy;
@@ -108,6 +110,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(SeoMetadata::class, CategoryPolicy::class);
         Gate::policy(Domain::class, DomainPolicy::class);
         Gate::policy(Organization::class, OrganizationAccessPolicy::class);
+        Gate::policy(AdCampaign::class, AdCampaignPolicy::class);
 
         RateLimiter::for('search', static function (Request $request): Limit {
             $perMinute = max(10, (int) config('search.rate_limit_per_minute', 120));

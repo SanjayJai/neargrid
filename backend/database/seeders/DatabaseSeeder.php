@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use Database\Seeders\Reference\AdPlacementsSeeder;
 use Database\Seeders\Reference\AttributesSeeder;
 use Database\Seeders\Reference\CategoriesSeeder;
 use Database\Seeders\Reference\LocationsSeeder;
@@ -25,6 +26,7 @@ class DatabaseSeeder extends Seeder
             CategoriesSeeder::class,
             AttributesSeeder::class,
             SearchSynonymsSeeder::class,
+            AdPlacementsSeeder::class,
         ]);
     }
 }
