@@ -148,6 +148,43 @@ export interface CategoryTreeResponseDto {
   collections: CategoryCollectionDto[];
 }
 
+export interface CustomerEnquiryItemDto {
+  public_id: string;
+  customer_name: string;
+  phone_e164: string;
+  email: string | null;
+  requirement: string;
+  urgency: string;
+  enquiry_type: 'direct' | 'broadcast';
+  status: string;
+  target_business: {
+    public_id: string;
+    name: string;
+    slug: string;
+  } | null;
+  category: {
+    public_id: string;
+    name: string;
+    slug: string;
+  };
+  city: {
+    name: string;
+    slug: string;
+  };
+  locality: {
+    name: string;
+    slug: string;
+  } | null;
+  recipients_count: number;
+  recipients: Array<{
+    public_id: string;
+    business_name: string;
+    business_slug: string;
+    delivery_status: string;
+  }>;
+  created_at?: string | null;
+}
+
 export interface CategoryAttributeDefinitionDto {
   public_id: string;
   attribute_key: string;

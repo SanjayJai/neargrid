@@ -317,7 +317,7 @@ export function CustomerHeader({ user, cities, activeDomain = null }: CustomerHe
               </Link>
               <NotificationBellFlyout user={user} />
               <Link
-                href="/dashboard/settings"
+                href="/account/profile"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink hover:bg-gray-50"
               >
                 <UserIcon className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
@@ -456,11 +456,18 @@ export function CustomerHeader({ user, cities, activeDomain = null }: CustomerHe
                   <span>{locale === 'ta' ? 'அறிவிப்புகள்' : 'Notifications'}</span>
                 </Link>
                 <Link
-                  href="/dashboard/settings"
+                  href="/account/enquiries"
                   onClick={() => setMobileOpen(false)}
                   className="rounded-lg px-3 py-2 text-sm font-medium text-ink hover:bg-gray-100"
                 >
-                  Account &amp; Devices ({user.name ?? user.phone_e164})
+                  {locale === 'ta' ? 'என் விசாரணைகள்' : 'My Enquiries'}
+                </Link>
+                <Link
+                  href="/account/profile"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-ink hover:bg-gray-100"
+                >
+                  My Account ({user.name ?? user.phone_e164})
                 </Link>
                 <button
                   type="button"

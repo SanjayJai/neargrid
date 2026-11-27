@@ -17,6 +17,7 @@ import {
   fetchPublicLocalities,
   fetchPublicSearch,
 } from '@/lib/api/public-directory';
+import { CategoryExplorerSection } from '@/modules/customer/components/CategoryExplorerSection';
 import { HomeDirectoryCard } from '@/modules/customer/components/HomeDirectoryCard';
 import { LiveSearchBar } from '@/modules/customer/components/LiveSearchBar';
 import { getCategoryVisual } from '@/modules/customer/lib/category-icons';
@@ -98,6 +99,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   // Build up to 16 category tiles from 5-level CategoryTree (fallback to legacy 2-level categories)
   const treeCategories = treeRes.ok && treeRes.data ? treeRes.data.categories : [];
+  const treeCollections = treeRes.ok && treeRes.data ? treeRes.data.collections : [];
   const fallbackCategories = legacyCategoriesRes.ok && legacyCategoriesRes.data ? legacyCategoriesRes.data : [];
 
   const categoryTiles =
@@ -256,7 +258,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      {/* 3. Explore Categories 8x2 Icon Grid */}
+      {/* 3. Dual-Panel Category Explorer (5-level tree + Collections + Fallback 8x2 Grid) */}
+      {treeCategories.length > 0 ? (
+        <CategoryExplorerSection
+          categories={treeCategories}
+          collections={treeCollections}
+          citySlug={activeCitySlug}
+          cityLabel={activeCityLabel}
+          locale={locale}
+        />
+      ) : (
       <section
         aria-labelledby="home-categories-heading"
         className="mx-auto mt-8 max-w-7xl px-4 sm:px-6 lg:px-8"
@@ -323,6 +334,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           )}
         </div>
       </section>
+      )}
 
       {/* 4. Verified Local Businesses Showcase */}
       <section

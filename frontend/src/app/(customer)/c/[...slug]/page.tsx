@@ -121,12 +121,19 @@ export default async function DynamicCategoryPage({
   ]);
 
   const basePath = `/c/${slugPath}`;
+  const cityQuery = requestedCity ? `?city=${encodeURIComponent(selectedCitySlug)}` : '';
   const breadcrumbs = [
-    { label: 'Home', href: '/' },
-    ...(landingRes.data.breadcrumbs ?? []).map((b, idx, arr) => ({
-      label: b.name,
-      href: idx < arr.length - 1 ? new URL(b.url).pathname : undefined,
-    })),
+    { label: 'Home', href: requestedCity ? `/${cityQuery}` : '/' },
+    ...(landingRes.data.breadcrumbs ?? []).map((b, idx, arr) => {
+      if (idx >= arr.length - 1) {
+        return { label: b.name, href: undefined };
+      }
+      const pathname = new URL(b.url, 'https://neargrid.in').pathname;
+      return {
+        label: b.name,
+        href: `${pathname}${cityQuery}`,
+      };
+    }),
   ];
 
   if (landingRes.data.kind === 'collection' && landingRes.data.collection) {
