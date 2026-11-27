@@ -29,7 +29,7 @@ describe('M-F2 M3 navigation & BFF proxy', () => {
     expect(m3Items.every((item) => item.enabled)).toBe(true);
 
     const laterItems = ALL_ADMIN_NAV_ITEMS.filter(
-      (item) => !['M1', 'M2', 'M3'].includes(item.milestone)
+      (item) => !['M1', 'M2', 'M3', 'M4'].includes(item.milestone)
     );
     expect(laterItems.length).toBeGreaterThan(0);
     expect(laterItems.every((item) => !item.enabled)).toBe(true);

@@ -68,6 +68,7 @@ export interface OtpChallengeResponseDto {
   challenge_id: string;
   expires_in_seconds: number;
   resend_after_seconds: number;
+  dev_otp?: string;
 }
 
 /**

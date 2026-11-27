@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
 use App\Http\Controllers\Api\V1\Admin\AdminLocationController;
 use App\Http\Controllers\Api\V1\Admin\AdminOrganizationController;
 use App\Http\Controllers\Api\V1\Admin\AdminReviewController;
+use App\Http\Controllers\Api\V1\Admin\AdminRoleController;
+use App\Http\Controllers\Api\V1\Admin\AdminSecurityController;
 use App\Http\Controllers\Api\V1\Admin\AdminSeoController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
 use App\Http\Controllers\Api\V1\Admin\AdminVerificationController;
@@ -221,8 +223,23 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
             Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
             Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
-            Route::patch('/users/{user}/status', [AdminUserController::class, 'updateStatus'])->name('users.status');
-            Route::post('/users/{user}/revoke-sessions', [AdminUserController::class, 'revokeSessions'])->name('users.revoke-sessions');
+            Route::patch('/users/{user}/status', [AdminUserController::class, 'updateStatus'])->middleware('throttle:30,1')->name('users.status');
+            Route::post('/users/{user}/verify', [AdminUserController::class, 'verifyAccount'])->middleware('throttle:30,1')->name('users.verify');
+            Route::post('/users/{user}/revoke-sessions', [AdminUserController::class, 'revokeSessions'])->middleware('throttle:30,1')->name('users.revoke-sessions');
+            Route::post('/users/{user}/roles', [AdminRoleController::class, 'assignUserRole'])->middleware('throttle:30,1')->name('users.roles.assign');
+            Route::delete('/users/{user}/roles/{role}', [AdminRoleController::class, 'removeUserRole'])->middleware('throttle:30,1')->name('users.roles.remove');
+            Route::post('/users/{user}/erasure-requests', [AdminUserController::class, 'requestErasure'])->middleware('throttle:15,1')->name('users.erasure.request');
+
+            Route::get('/erasure-requests', [AdminUserController::class, 'indexErasureRequests'])->name('erasure.index');
+            Route::post('/erasure-requests/{erasureRequest}/review', [AdminUserController::class, 'reviewErasureRequest'])->middleware('throttle:15,1')->name('erasure.review');
+
+            Route::get('/roles', [AdminRoleController::class, 'indexRoles'])->name('roles.index');
+            Route::put('/roles/{role}/permissions', [AdminRoleController::class, 'syncRolePermissions'])->middleware('throttle:20,1')->name('roles.permissions.sync');
+            Route::get('/permissions', [AdminRoleController::class, 'indexPermissions'])->name('permissions.index');
+
+            Route::get('/security/sessions', [AdminSecurityController::class, 'sessions'])->name('security.sessions.index');
+            Route::delete('/security/sessions/{tokenPublicId}', [AdminSecurityController::class, 'revokeSession'])->middleware('throttle:30,1')->name('security.sessions.revoke');
+            Route::get('/security/events', [AdminSecurityController::class, 'events'])->name('security.events.index');
 
             Route::get('/audit-logs', [AdminAuditLogController::class, 'index'])->name('audit-logs.index');
 

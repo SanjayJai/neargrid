@@ -17,6 +17,7 @@ return [
         'ttl_seconds' => (int) env('OTP_TTL_SECONDS', 300),
         'max_attempts' => (int) env('OTP_MAX_ATTEMPTS', 5),
         'resend_cooldown_seconds' => (int) env('OTP_RESEND_COOLDOWN_SECONDS', 45),
+        'expose_dev_otp' => filter_var(env('OTP_EXPOSE_DEV_CODE', false), FILTER_VALIDATE_BOOLEAN),
         'pepper' => env('APP_OTP_PEPPER', env('APP_KEY')),
         'allowed_country_prefixes' => array_filter(array_map(
             'trim',

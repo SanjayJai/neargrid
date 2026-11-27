@@ -21,6 +21,7 @@ export function OtpLoginForm({ redirectTo }: OtpLoginFormProps) {
   const [name, setName] = useState('');
   const [challengeId, setChallengeId] = useState('');
   const [otp, setOtp] = useState('');
+  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export function OtpLoginForm({ redirectTo }: OtpLoginFormProps) {
       }
 
       setChallengeId(res.payload.data.challenge_id);
+      setDevOtp(res.payload.data.dev_otp ?? null);
       setCooldown(res.payload.data.resend_after_seconds);
       setStep('otp');
       setInfoMessage('Verification code dispatched via Laravel OTP API. Enter the 6-digit code below.');
@@ -93,6 +95,7 @@ export function OtpLoginForm({ redirectTo }: OtpLoginFormProps) {
       }
 
       setChallengeId(res.payload.data.challenge_id);
+      setDevOtp(res.payload.data.dev_otp ?? null);
       setCooldown(res.payload.data.resend_after_seconds);
       setInfoMessage('A new 6-digit verification code has been requested.');
     } finally {
@@ -220,6 +223,20 @@ export function OtpLoginForm({ redirectTo }: OtpLoginFormProps) {
         </form>
       ) : (
         <form onSubmit={handleVerifyOtp} className="space-y-4">
+          {devOtp && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900">
+              <span>
+                Development OTP: <strong className="font-mono text-sm">{devOtp}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setOtp(devOtp)}
+                className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 font-semibold text-amber-900 hover:bg-amber-100"
+              >
+                Use Code
+              </button>
+            </div>
+          )}
           <div>
             <label htmlFor="otp-input" className="mb-1.5 block text-sm font-medium text-zinc-900">
               6-Digit Verification Code

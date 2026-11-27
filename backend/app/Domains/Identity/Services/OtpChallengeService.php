@@ -70,11 +70,18 @@ final class OtpChallengeService
             challengeId: $challenge->challenge_id,
         )->afterCommit();
 
-        return [
+        $payload = [
             'challenge_id' => $challenge->challenge_id,
             'expires_in_seconds' => $ttlSeconds,
             'resend_after_seconds' => $cooldownSeconds,
         ];
+
+        // Expose OTP only in local development when explicitly enabled via OTP_EXPOSE_DEV_CODE=true.
+        if (app()->environment('local') && (bool) config('directory.otp.expose_dev_otp', false) === true) {
+            $payload['dev_otp'] = $otpCode;
+        }
+
+        return $payload;
     }
 
     /**
