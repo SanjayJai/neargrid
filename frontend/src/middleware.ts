@@ -18,7 +18,12 @@ export function middleware(request: NextRequest): NextResponse {
     });
   }
 
-  if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
+  if (
+    pathname === '/dashboard' ||
+    pathname.startsWith('/dashboard/') ||
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/')
+  ) {
     const hasSessionCookie = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
     if (!hasSessionCookie) {
       const loginUrl = new URL('/login', request.url);
@@ -40,5 +45,5 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ['/dashboard', '/dashboard/:path*'],
+  matcher: ['/dashboard', '/dashboard/:path*', '/admin', '/admin/:path*'],
 };
