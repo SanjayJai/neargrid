@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Account\SavedBusinessController;
 use App\Http\Controllers\Api\V1\Admin\AdminAdCampaignController;
 use App\Http\Controllers\Api\V1\Admin\AdminAdCreativeController;
+use App\Http\Controllers\Api\V1\Admin\AdminAdPlacementController;
+use App\Http\Controllers\Api\V1\Advertising\PublicAdController;
 use App\Http\Controllers\Api\V1\Admin\AdminAnalyticsController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminBootstrapController;
@@ -56,6 +58,13 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         ->name('categories.landing');
     Route::get('/attributes', [ReferenceTaxonomyController::class, 'attributes'])->name('attributes.index');
     Route::get('/public/domains/resolve', [PublicDomainController::class, 'resolve'])->name('public.domains.resolve');
+
+    // Public advertising delivery & tracking (rate-limited, signed attribution)
+    Route::prefix('public/ads')->name('public.ads.')->group(function (): void {
+        Route::get('/deliver', [PublicAdController::class, 'deliver'])->middleware('throttle:120,1')->name('deliver');
+        Route::post('/impression', [PublicAdController::class, 'recordImpression'])->middleware('throttle:120,1')->name('impression');
+        Route::post('/click', [PublicAdController::class, 'recordClick'])->middleware('throttle:60,1')->name('click');
+    });
 
     // Public business profiles (only status=active, privacy-safe resource)
     Route::get('/businesses/{citySlug}/{businessSlug}', [PublicBusinessController::class, 'show'])->name('businesses.show');
@@ -315,7 +324,13 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                 Route::patch('/campaigns/{adCampaign}/status', [AdminAdCampaignController::class, 'updateStatus'])->name('campaigns.status');
                 Route::put('/campaigns/{adCampaign}/placements', [AdminAdCampaignController::class, 'syncPlacements'])->name('campaigns.placements.sync');
                 Route::put('/campaigns/{adCampaign}/businesses', [AdminAdCampaignController::class, 'syncBusinesses'])->name('campaigns.businesses.sync');
+                Route::put('/campaigns/{adCampaign}/targeting-rules', [AdminAdCampaignController::class, 'syncTargetingRules'])->name('campaigns.targeting.sync');
                 Route::delete('/campaigns/{adCampaign}', [AdminAdCampaignController::class, 'destroy'])->name('campaigns.destroy');
+
+                Route::get('/placements', [AdminAdPlacementController::class, 'index'])->name('placements.index');
+                Route::get('/placements/conflicts', [AdminAdPlacementController::class, 'conflicts'])->name('placements.conflicts');
+                Route::get('/placements/{adPlacement}', [AdminAdPlacementController::class, 'show'])->name('placements.show');
+                Route::patch('/placements/{adPlacement}', [AdminAdPlacementController::class, 'update'])->name('placements.update');
 
                 Route::get('/creatives', [AdminAdCreativeController::class, 'index'])->name('creatives.index');
                 Route::post('/creatives', [AdminAdCreativeController::class, 'store'])->name('creatives.store');

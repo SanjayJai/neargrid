@@ -47,6 +47,7 @@ import { BusinessProfileActions } from './BusinessProfileActions';
 import { CustomerReviewsSection } from './CustomerReviewsSection';
 import { DynamicAttributeSectionCard } from './DynamicAttributeSectionCard';
 import { EnquiryModal } from './EnquiryModal';
+import { AdPlacementSlot } from './ads/AdPlacementSlot';
 
 interface BusinessProfileViewProps {
   profile: PublicBusinessProfileDto;
@@ -895,6 +896,16 @@ export function BusinessProfileView({
               </p>
             </div>
           )}
+          <AdPlacementSlot
+            placementKey="business.sidebar_alternatives"
+            context={{
+              pageType: 'business_profile',
+              routePath: canonicalPath,
+              citySlug,
+              localitySlug: profile.address.locality?.slug,
+              categorySlug: profile.primary_category?.slug,
+            }}
+          />
         </aside>
       </div>
 

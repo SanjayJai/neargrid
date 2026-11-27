@@ -29,6 +29,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'ends_at',
     'daily_impression_cap',
     'total_impression_cap',
+    'impressions_today',
+    'impressions_today_date',
+    'total_impressions',
+    'total_clicks',
     'approved_at',
     'rejection_reason',
 ])]
@@ -53,6 +57,10 @@ class AdCampaign extends Model
             'ends_at' => 'datetime',
             'daily_impression_cap' => 'integer',
             'total_impression_cap' => 'integer',
+            'impressions_today' => 'integer',
+            'impressions_today_date' => 'date',
+            'total_impressions' => 'integer',
+            'total_clicks' => 'integer',
             'approved_at' => 'datetime',
         ];
     }

@@ -6,9 +6,15 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domains\Advertising\Models\AdCampaign;
 use App\Domains\Advertising\Models\AdPlacement;
+use App\Domains\Advertising\Models\AdTargetingRule;
 use App\Domains\Directory\Models\Business;
 use App\Domains\Directory\Models\Organization;
+use App\Domains\Domains\Models\Domain;
 use App\Domains\Governance\Services\AuditLogger;
+use App\Domains\Location\Models\City;
+use App\Domains\Location\Models\Locality;
+use App\Domains\Location\Models\State;
+use App\Domains\Taxonomy\Models\Category;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\Api\ApiResponse;
@@ -185,6 +191,7 @@ final class AdminAdCampaignController extends Controller
             'creatives',
             'placements',
             'businesses:id,public_id,name,slug,organization_id,status',
+            'targetingRules',
         ]);
 
         $availablePlacements = AdPlacement::query()
@@ -231,6 +238,13 @@ final class AdminAdCampaignController extends Controller
                 'slug' => $b->slug,
                 'status' => $b->status?->value ?? (string) $b->status,
                 'is_primary' => (bool) ($b->pivot->is_primary ?? false),
+            ])->values()->all(),
+            'targeting_rules' => $adCampaign->targetingRules->map(static fn (AdTargetingRule $r): array => [
+                'public_id' => $r->public_id,
+                'target_type' => $r->target_type,
+                'include_descendants' => (bool) $r->include_descendants,
+                'target_value' => $r->target_value,
+                'is_exclude' => (bool) $r->is_exclude,
             ])->values()->all(),
             'available_placements' => $availablePlacements,
         ]);
@@ -504,6 +518,81 @@ final class AdminAdCampaignController extends Controller
         });
 
         return ApiResponse::success(['business_count' => count($syncMap)], ['message' => 'Campaign businesses updated.']);
+    }
+
+    public function syncTargetingRules(Request $request, AdCampaign $adCampaign): JsonResponse
+    {
+        Gate::authorize('manageAdmin', User::class);
+
+        $validated = $request->validate([
+            'rules' => ['required', 'array', 'max:50'],
+            'rules.*.target_type' => ['required', 'string', Rule::in(AdTargetingRule::VALID_TARGET_TYPES)],
+            'rules.*.category_public_id' => ['nullable', 'string', 'exists:categories,public_id'],
+            'rules.*.include_descendants' => ['nullable', 'boolean'],
+            'rules.*.state_public_id' => ['nullable', 'string', 'exists:states,public_id'],
+            'rules.*.city_public_id' => ['nullable', 'string', 'exists:cities,public_id'],
+            'rules.*.locality_public_id' => ['nullable', 'string', 'exists:localities,public_id'],
+            'rules.*.domain_public_id' => ['nullable', 'string', 'exists:domains,public_id'],
+            'rules.*.target_value' => ['nullable', 'string', 'max:120'],
+            'rules.*.is_exclude' => ['nullable', 'boolean'],
+        ]);
+
+        /** @var User $actor */
+        $actor = $request->user();
+
+        try {
+            $count = DB::transaction(function () use ($actor, $adCampaign, $validated, $request): int {
+                $adCampaign->targetingRules()->delete();
+
+                $created = 0;
+                foreach ($validated['rules'] as $item) {
+                    $categoryId = ! empty($item['category_public_id'])
+                        ? Category::query()->where('public_id', $item['category_public_id'])->value('id')
+                        : null;
+                    $stateId = ! empty($item['state_public_id'])
+                        ? State::query()->where('public_id', $item['state_public_id'])->value('id')
+                        : null;
+                    $cityId = ! empty($item['city_public_id'])
+                        ? City::query()->where('public_id', $item['city_public_id'])->value('id')
+                        : null;
+                    $localityId = ! empty($item['locality_public_id'])
+                        ? Locality::query()->where('public_id', $item['locality_public_id'])->value('id')
+                        : null;
+                    $domainId = ! empty($item['domain_public_id'])
+                        ? Domain::query()->where('public_id', $item['domain_public_id'])->value('id')
+                        : null;
+
+                    AdTargetingRule::query()->create([
+                        'ad_campaign_id' => $adCampaign->id,
+                        'target_type' => (string) $item['target_type'],
+                        'category_id' => $categoryId,
+                        'include_descendants' => (bool) ($item['include_descendants'] ?? true),
+                        'state_id' => $stateId,
+                        'city_id' => $cityId,
+                        'locality_id' => $localityId,
+                        'domain_id' => $domainId,
+                        'target_value' => $item['target_value'] ?? null,
+                        'is_exclude' => (bool) ($item['is_exclude'] ?? false),
+                    ]);
+                    $created++;
+                }
+
+                $this->auditLogger->record(
+                    actor: $actor,
+                    action: 'ad_campaign.targeting_synced',
+                    auditable: $adCampaign,
+                    newValues: ['rule_count' => $created],
+                    actorRole: 'super_admin',
+                    ipAddress: $request->ip(),
+                );
+
+                return $created;
+            });
+        } catch (\InvalidArgumentException $e) {
+            return ApiResponse::error('INVALID_TARGETING_RULE', $e->getMessage(), 422);
+        }
+
+        return ApiResponse::success(['rule_count' => $count], ['message' => 'Campaign targeting rules updated.']);
     }
 
     public function destroy(Request $request, AdCampaign $adCampaign): JsonResponse

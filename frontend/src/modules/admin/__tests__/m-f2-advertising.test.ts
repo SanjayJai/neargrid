@@ -25,7 +25,7 @@ describe('M-F2 M5.2 campaign & creative administration', () => {
     vi.clearAllMocks();
   });
 
-  it('enables ad-campaigns and ad-creatives while keeping ad-placements (M5.3) disabled', () => {
+  it('enables ad-campaigns, ad-creatives, and ad-placements in admin navigation', () => {
     const campaigns = ALL_ADMIN_NAV_ITEMS.find((i) => i.key === 'ad-campaigns');
     const creatives = ALL_ADMIN_NAV_ITEMS.find((i) => i.key === 'ad-creatives');
     const placements = ALL_ADMIN_NAV_ITEMS.find((i) => i.key === 'ad-placements');
@@ -34,7 +34,8 @@ describe('M-F2 M5.2 campaign & creative administration', () => {
     expect(campaigns?.href).toBe('/admin/advertising/campaigns');
     expect(creatives?.enabled).toBe(true);
     expect(creatives?.href).toBe('/admin/advertising/creatives');
-    expect(placements?.enabled).toBe(false);
+    expect(placements?.enabled).toBe(true);
+    expect(placements?.href).toBe('/admin/advertising/placements');
   });
 
   it('forwards advertising BFF requests with server-side bearer token and enforces mutation security', async () => {

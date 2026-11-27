@@ -20,6 +20,7 @@ import {
 import { DirectoryListingCard } from './DirectoryListingCard';
 import { HorizontalFilterBar } from './HorizontalFilterBar';
 import { SearchPagination } from './SearchPagination';
+import { AdPlacementSlot } from './ads/AdPlacementSlot';
 
 interface SearchResultsClientProps {
   initialHits: SearchBusinessHitDto[];
@@ -248,6 +249,17 @@ export function SearchResultsClient({
 
       {/* Full-Width Business Results */}
       <div className="mt-5 w-full space-y-4">
+        <AdPlacementSlot
+          placementKey="search.top_leaderboard"
+          context={{
+            pageType: 'search',
+            routePath: '/search',
+            locale: currentParams.locale === 'ta' ? 'ta' : 'en',
+            citySlug: currentParams.city,
+            localitySlug: currentParams.locality,
+            categorySlug: currentParams.category,
+          }}
+        />
 
           {/* Results State */}
           {loading ? (

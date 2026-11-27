@@ -16,6 +16,7 @@ import { EmptyState } from '@/shared/ui/StateFeedback';
 import { DirectoryListingCard } from './DirectoryListingCard';
 import { HorizontalFilterBar } from './HorizontalFilterBar';
 import { SearchPagination } from './SearchPagination';
+import { AdPlacementSlot } from './ads/AdPlacementSlot';
 
 interface CanonicalDirectoryViewProps {
   citySlug: string;
@@ -230,6 +231,19 @@ export function CanonicalDirectoryView({
               ))}
             </div>
           )}
+
+          <AdPlacementSlot
+            placementKey="city_hub.locality_featured"
+            className="mb-4"
+            context={{
+              pageType: 'city_hub',
+              routePath: baseCanonicalPath,
+              locale: currentParams.locale === 'ta' ? 'ta' : 'en',
+              citySlug,
+              localitySlug,
+              categorySlug,
+            }}
+          />
 
           {/* Pagination */}
           {!isPending && hits.length > 0 && totalPages > 1 && (

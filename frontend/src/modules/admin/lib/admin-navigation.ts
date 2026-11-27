@@ -149,12 +149,12 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       {
         key: 'ad-placements',
         label: 'Ad Placements (30+)',
-        href: '/admin/ads/placements',
+        href: '/admin/advertising/placements',
         group: 'growth',
         description: 'Configurable placement slots & visibility rules',
         keywords: ['ads', 'slots', 'banners'],
         milestone: 'M5',
-        enabled: false,
+        enabled: true,
       },
       {
         key: 'ad-campaigns',

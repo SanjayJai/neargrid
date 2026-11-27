@@ -18,6 +18,7 @@ import { EmptyState } from '@/shared/ui/StateFeedback';
 import { DirectoryListingCard } from './DirectoryListingCard';
 import { HorizontalFilterBar } from './HorizontalFilterBar';
 import { SearchPagination } from './SearchPagination';
+import { AdPlacementSlot } from './ads/AdPlacementSlot';
 
 interface CategoryLandingViewProps {
   landing: CategoryLandingResponseDto;
@@ -248,6 +249,17 @@ export function CategoryLandingView({
 
       {/* Full-Width Listings */}
       <div className="mt-5 w-full space-y-4">
+        <AdPlacementSlot
+          placementKey="category.top_sponsored_cards"
+          context={{
+            pageType: 'category',
+            routePath: basePath,
+            locale: currentParams.locale === 'ta' ? 'ta' : 'en',
+            citySlug: selectedCitySlug,
+            localitySlug: currentParams.locality,
+            categorySlug: landing.category?.slug,
+          }}
+        />
         {isPending ? (
           <DirectoryCardSkeleton count={5} />
         ) : hits.length === 0 ? (

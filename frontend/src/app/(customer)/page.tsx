@@ -20,6 +20,7 @@ import {
 import { CategoryExplorerSection } from '@/modules/customer/components/CategoryExplorerSection';
 import { HomeDirectoryCard } from '@/modules/customer/components/HomeDirectoryCard';
 import { LiveSearchBar } from '@/modules/customer/components/LiveSearchBar';
+import { AdPlacementSlot } from '@/modules/customer/components/ads/AdPlacementSlot';
 import { getCategoryVisual } from '@/modules/customer/lib/category-icons';
 import {
   buildShareableSearchUrl,
@@ -384,7 +385,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </section>
 
       {/* 5. Location Discovery & Merchant CTA */}
-      <section className="mx-auto mt-8 max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section className="mx-auto mt-8 max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
+        <AdPlacementSlot
+          placementKey="home.featured_carousel"
+          context={{ pageType: 'home', routePath: '/', locale, citySlug: activeCitySlug }}
+        />
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-2">
             <h2 className="flex items-center gap-2 text-base font-extrabold text-ink">

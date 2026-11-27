@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Search\Services;
 
+use App\Domains\Advertising\DTOs\AdDeliveryContext;
+use App\Domains\Advertising\Models\AdCampaign;
+use App\Domains\Advertising\Models\AdPlacement;
+use App\Domains\Advertising\Services\AdEligibilityService;
 use App\Domains\Directory\Enums\BusinessStatus;
 use App\Domains\Search\DTOs\SearchHit;
 use App\Domains\Search\DTOs\SearchQuery;
@@ -14,6 +18,7 @@ final class SponsoredPlacementSelector
 {
     public function __construct(
         private readonly GeoSpatialHelper $geoHelper,
+        private readonly ?AdEligibilityService $adEligibility = null,
     ) {}
 
     /**
@@ -173,6 +178,171 @@ final class SponsoredPlacementSelector
                 sponsorDisclosure: $disclosure,
                 relevanceScore: 1.0,
             );
+
+            if (count($hits) >= $maxSlots) {
+                break;
+            }
+        }
+
+        if (count($hits) < $maxSlots) {
+            $hits = $this->appendEligibleFeaturedCampaignHits(
+                hits: $hits,
+                seenBusinessIds: $seenBusinessIds,
+                maxSlots: $maxSlots,
+                query: $query,
+                cityId: $cityId,
+                targetCategoryIds: $targetCategoryIds,
+                localityIds: $localityIds,
+                anchorLat: $anchorLat,
+                anchorLng: $anchorLng,
+                effectiveRadiusKm: $effectiveRadiusKm,
+                locales: $locales,
+                now: $now,
+                minCompleteness: $minCompleteness,
+                minRatingFloor: $minRatingFloor,
+                minReviewsFloor: $minReviewsFloor,
+                disclosure: $disclosure,
+            );
+        }
+
+        return $hits;
+    }
+
+    /**
+     * @param  list<SearchHit>  $hits
+     * @param  array<int, bool>  $seenBusinessIds
+     * @param  list<int>  $targetCategoryIds
+     * @param  list<int>  $localityIds
+     * @param  list<string>  $locales
+     * @return list<SearchHit>
+     */
+    private function appendEligibleFeaturedCampaignHits(
+        array $hits,
+        array $seenBusinessIds,
+        int $maxSlots,
+        SearchQuery $query,
+        int $cityId,
+        array $targetCategoryIds,
+        array $localityIds,
+        ?float $anchorLat,
+        ?float $anchorLng,
+        ?float $effectiveRadiusKm,
+        array $locales,
+        CarbonImmutable $now,
+        int $minCompleteness,
+        float $minRatingFloor,
+        int $minReviewsFloor,
+        string $disclosure,
+    ): array {
+        $campaigns = AdCampaign::query()
+            ->where('status', 'active')
+            ->where('campaign_type', 'featured_listing')
+            ->whereNull('deleted_at')
+            ->with([
+                'creatives' => static fn ($q) => $q->where('status', 'active'),
+                'targetingRules',
+                'businesses' => static function ($b) use ($cityId, $locales, $minCompleteness, $minRatingFloor, $minReviewsFloor, $targetCategoryIds, $localityIds, $query): void {
+                    $b->where('status', BusinessStatus::Active->value)
+                        ->whereNull('deleted_at')
+                        ->where('city_id', $cityId)
+                        ->where('completeness_score', '>=', $minCompleteness)
+                        ->where(function ($rf) use ($minRatingFloor, $minReviewsFloor): void {
+                            $rf->where('review_count', '<', $minReviewsFloor)
+                                ->orWhere('rating_avg', '>=', $minRatingFloor);
+                        });
+                    if ($targetCategoryIds !== []) {
+                        $b->where(function ($cq) use ($targetCategoryIds): void {
+                            $cq->whereIn('primary_category_id', $targetCategoryIds)
+                                ->orWhereHas('categories', static fn ($c) => $c->whereIn('categories.id', $targetCategoryIds));
+                        });
+                    }
+                    if ($localityIds !== []) {
+                        $b->whereIn('locality_id', $localityIds);
+                    }
+                    if ($query->verifiedOnly) {
+                        $b->where('is_verified', true);
+                    }
+                    if ($query->minRating !== null) {
+                        $b->where('rating_avg', '>=', $query->minRating);
+                    }
+                    $b->with([
+                        'city.translations' => static fn ($q) => $q->whereIn('locale', $locales),
+                        'locality.translations' => static fn ($q) => $q->whereIn('locale', $locales),
+                        'primaryCategory.translations' => static fn ($q) => $q->whereIn('locale', $locales),
+                        'hours',
+                        'services' => static fn ($q) => $q->where('is_active', true),
+                        'media' => static fn ($q) => $q->publicApproved(),
+                    ]);
+                },
+            ])
+            ->orderByDesc('priority')
+            ->orderBy('id')
+            ->limit($maxSlots * 3)
+            ->get();
+
+        $eligibility = $this->adEligibility ?? new AdEligibilityService();
+        $virtualPlacement = new AdPlacement(['supports_category_targeting' => true, 'supports_location_targeting' => true, 'supports_domain_targeting' => true]);
+        $context = new AdDeliveryContext(
+            pageType: 'search',
+            placementKeys: ['search.native_slot_1'],
+            routePath: '/search',
+            locale: $query->locale,
+            cityId: $cityId,
+            localityId: $localityIds[0] ?? null,
+            categoryId: $targetCategoryIds[0] ?? null,
+            categoryAncestorIds: $targetCategoryIds,
+        );
+
+        $seenOrgIds = [];
+
+        foreach ($campaigns as $campaign) {
+            if ($campaign->starts_at !== null && $campaign->starts_at->gt($now)) {
+                continue;
+            }
+            if ($campaign->ends_at !== null && $campaign->ends_at->lte($now)) {
+                continue;
+            }
+            if (! $eligibility->hasRemainingImpressionCap($campaign, $now)) {
+                continue;
+            }
+            if (! $eligibility->matchesTargeting($campaign, $virtualPlacement, $context)) {
+                continue;
+            }
+            if ($campaign->organization_id !== null && isset($seenOrgIds[$campaign->organization_id])) {
+                continue;
+            }
+
+            foreach ($campaign->businesses as $business) {
+                if (isset($seenBusinessIds[$business->id])) {
+                    continue;
+                }
+                if ($query->openNow && ! $business->isOpenNow()) {
+                    continue;
+                }
+
+                $distanceKm = null;
+                if ($anchorLat !== null && $anchorLng !== null) {
+                    $distanceKm = $this->geoHelper->distanceKm($anchorLat, $anchorLng, (float) $business->latitude, (float) $business->longitude);
+                    if ($effectiveRadiusKm !== null && $distanceKm > $effectiveRadiusKm) {
+                        continue;
+                    }
+                }
+
+                $seenBusinessIds[$business->id] = true;
+                if ($campaign->organization_id !== null) {
+                    $seenOrgIds[$campaign->organization_id] = true;
+                }
+
+                $hits[] = new SearchHit(
+                    business: $business,
+                    distanceKm: $distanceKm,
+                    isSponsored: true,
+                    sponsorDisclosure: $disclosure,
+                    relevanceScore: 1.0,
+                );
+
+                break; // Max 1 branch per campaign per page
+            }
 
             if (count($hits) >= $maxSlots) {
                 break;
