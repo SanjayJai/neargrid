@@ -175,7 +175,8 @@ final class AdminAnalyticsTest extends TestCase
     public function test_half_open_date_boundary_includes_final_day_and_excludes_next_day_midnight(): void
     {
         // Insert search logs directly with boundary timestamps:
-        // 1) Final day at 23:59:59.500 -> MUST be included in 2026-11-01..2026-11-15
+        // 1) Final day at 23:59:59.400 -> MUST be included in 2026-11-01..2026-11-15
+        //    (Use .400000 because MySQL 8 TIMESTAMP(0) rounds .500000+ up to 00:00:00 next day)
         // 2) Next day at 00:00:00 -> MUST be excluded
         DB::table('search_query_logs')->insert([
             [
@@ -186,7 +187,7 @@ final class AdminAnalyticsTest extends TestCase
                 'result_count' => 2,
                 'duration_ms' => 20,
                 'engine_driver' => 'mysql',
-                'created_at' => '2026-11-15 23:59:59.500000',
+                'created_at' => '2026-11-15 23:59:59.400000',
             ],
             [
                 'normalized_query' => 'boundary-out',
