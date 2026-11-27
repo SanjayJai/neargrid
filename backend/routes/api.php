@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Account\SavedBusinessController;
+use App\Http\Controllers\Api\V1\Admin\AdminAnalyticsController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
+use App\Http\Controllers\Api\V1\Admin\AdminBootstrapController;
 use App\Http\Controllers\Api\V1\Admin\AdminCategoryCollectionController;
 use App\Http\Controllers\Api\V1\Admin\AdminCategoryController;
 use App\Http\Controllers\Api\V1\Admin\AdminDomainController;
@@ -182,6 +184,8 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
         // Super Admin foundation endpoints (governance, moderation & audit)
         Route::prefix('admin')->name('admin.')->group(function (): void {
+            Route::get('/bootstrap', [AdminBootstrapController::class, 'show'])->name('bootstrap');
+            Route::get('/analytics', [AdminAnalyticsController::class, 'index'])->name('analytics');
             Route::get('/enquiries', [AdminEnquiryController::class, 'index'])->name('enquiries.index');
             Route::get('/enquiries/{enquiry}', [AdminEnquiryController::class, 'show'])->name('enquiries.show');
             Route::patch('/enquiries/{enquiry}/cancel', [AdminEnquiryController::class, 'cancel'])->name('enquiries.cancel');
