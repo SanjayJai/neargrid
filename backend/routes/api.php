@@ -6,11 +6,13 @@ use App\Http\Controllers\Api\V1\Account\SavedBusinessController;
 use App\Http\Controllers\Api\V1\Admin\AdminAnalyticsController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminBootstrapController;
+use App\Http\Controllers\Api\V1\Admin\AdminBusinessController;
 use App\Http\Controllers\Api\V1\Admin\AdminCategoryCollectionController;
 use App\Http\Controllers\Api\V1\Admin\AdminCategoryController;
 use App\Http\Controllers\Api\V1\Admin\AdminDomainController;
 use App\Http\Controllers\Api\V1\Admin\AdminEnquiryController;
 use App\Http\Controllers\Api\V1\Admin\AdminLocationController;
+use App\Http\Controllers\Api\V1\Admin\AdminOrganizationController;
 use App\Http\Controllers\Api\V1\Admin\AdminReviewController;
 use App\Http\Controllers\Api\V1\Admin\AdminSeoController;
 use App\Http\Controllers\Api\V1\Admin\AdminUserController;
@@ -197,6 +199,25 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::get('/verifications', [AdminVerificationController::class, 'index'])->name('verifications.index');
             Route::get('/businesses/{business}/kyc-documents/{kycDocument}/signed-url', [AdminVerificationController::class, 'signedUrl'])->name('verifications.kyc-signed-url');
             Route::post('/verifications/{verification}/review', [AdminVerificationController::class, 'review'])->name('verifications.review');
+            Route::get('/claims', [AdminVerificationController::class, 'indexClaims'])->name('claims.index');
+            Route::post('/claims/{claim}/review', [AdminVerificationController::class, 'reviewClaim'])->name('claims.review');
+
+            Route::prefix('businesses')->name('businesses.')->group(function (): void {
+                Route::get('/', [AdminBusinessController::class, 'index'])->name('index');
+                Route::get('/{business}', [AdminBusinessController::class, 'show'])->name('show');
+                Route::patch('/{business}/status', [AdminBusinessController::class, 'updateStatus'])->name('status');
+                Route::patch('/{business}/badges', [AdminBusinessController::class, 'updateBadges'])->name('badges');
+            });
+
+            Route::prefix('organizations')->name('organizations.')->group(function (): void {
+                Route::get('/', [AdminOrganizationController::class, 'index'])->name('index');
+                Route::post('/', [AdminOrganizationController::class, 'store'])->name('store');
+                Route::get('/{organization}', [AdminOrganizationController::class, 'show'])->name('show');
+                Route::patch('/{organization}', [AdminOrganizationController::class, 'update'])->name('update');
+                Route::post('/{organization}/branches', [AdminOrganizationController::class, 'attachBranch'])->name('branches.attach');
+                Route::patch('/{organization}/branches/{business}/hq-lead-access', [AdminOrganizationController::class, 'setFranchiseHqLeadAccess'])->name('branches.hq-lead-access');
+                Route::post('/{organization}/members', [AdminOrganizationController::class, 'upsertMember'])->name('members.upsert');
+            });
 
             Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
             Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
@@ -255,6 +276,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             });
 
             Route::prefix('seo')->name('seo.')->group(function (): void {
+                Route::get('/metadata', [AdminSeoController::class, 'indexMetadata'])->name('metadata.index');
+                Route::get('/redirects', [AdminSeoController::class, 'indexRedirects'])->name('redirects.index');
+                Route::post('/redirects', [AdminSeoController::class, 'storeRedirect'])->name('redirects.store');
+                Route::patch('/redirects/{urlRedirect}', [AdminSeoController::class, 'updateRedirect'])->name('redirects.update');
+                Route::delete('/redirects/{urlRedirect}', [AdminSeoController::class, 'destroyRedirect'])->name('redirects.destroy');
                 Route::get('/{entityType}/{entityIdentifier}', [AdminSeoController::class, 'show'])->name('show');
                 Route::put('/{entityType}/{entityIdentifier}', [AdminSeoController::class, 'upsert'])->name('upsert');
                 Route::post('/metadata/{seoMetadata}/rollback/{revision}', [AdminSeoController::class, 'rollback'])->name('rollback');

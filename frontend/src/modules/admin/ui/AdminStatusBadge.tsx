@@ -3,7 +3,8 @@
 export type AdminBadgeTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
 interface AdminStatusBadgeProps {
-  label: string;
+  label?: string;
+  status?: string;
   tone?: AdminBadgeTone;
 }
 
@@ -15,12 +16,28 @@ const TONE_CLASSES: Record<AdminBadgeTone, string> = {
   neutral: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
 };
 
-export function AdminStatusBadge({ label, tone = 'neutral' }: AdminStatusBadgeProps) {
+function inferTone(text: string): AdminBadgeTone {
+  const normalized = text.trim().toLowerCase();
+  if (['active', 'approved', 'verified', 'published', 'issued', 'valid'].includes(normalized)) {
+    return 'success';
+  }
+  if (['pending', 'pending_review', 'pending_otp', 'under_review', 'flagged', 'unclaimed'].includes(normalized)) {
+    return 'warning';
+  }
+  if (['suspended', 'rejected', 'cancelled', 'expired', 'archived', 'failed'].includes(normalized)) {
+    return 'danger';
+  }
+  return 'neutral';
+}
+
+export function AdminStatusBadge({ label, status, tone }: AdminStatusBadgeProps) {
+  const display = label ?? status ?? '—';
+  const resolvedTone = tone ?? inferTone(display);
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${TONE_CLASSES[tone]}`}
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${TONE_CLASSES[resolvedTone]}`}
     >
-      {label}
+      {display}
     </span>
   );
 }
