@@ -1,7 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+
+(globalThis as { React?: typeof React }).React = React;
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
 
 const mockReadSession = vi.fn();
 const mockGetUser = vi.fn();
@@ -186,12 +197,99 @@ describe('Merchant Dashboard Authentication & OTP Placeholder Security', () => {
       undefined,
     ];
     for (const bad of malicious) {
-      expect(sanitizeInternalRedirectPath(bad)).toBe('/dashboard/settings');
+      expect(sanitizeInternalRedirectPath(bad)).toBe('/account');
     }
 
     expect(sanitizeInternalRedirectPath('/dashboard')).toBe('/dashboard');
+    expect(sanitizeInternalRedirectPath('/business/dashboard')).toBe('/business/dashboard');
     expect(sanitizeInternalRedirectPath('/dashboard/enquiries?tab=new')).toBe(
       '/dashboard/enquiries?tab=new'
     );
+  });
+
+  it('routes post-login by role and protects /business/dashboard and /account for guests, customers, owners, staff, and super_admin', async () => {
+    const { resolvePostLoginRedirect } = await import('@/modules/customer/lib/auth-redirect');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { MerchantAccessDenied } = await import('@/modules/business/components/MerchantAccessDenied');
+
+    // Guest middleware redirects on /business/dashboard and /account
+    for (const protectedPath of ['/business/dashboard', '/account', '/account/profile']) {
+      const guestReq = new NextRequest(`http://localhost:3000${protectedPath}`);
+      const guestRes = middleware(guestReq);
+      expect(guestRes.status).toBe(307);
+      expect(guestRes.headers.get('location')).toBe(
+        `http://localhost:3000/login?next=${encodeURIComponent(protectedPath)}`
+      );
+    }
+
+    // Role-based post-login redirects (no ?next= provided)
+    expect(resolvePostLoginRedirect({ roles: ['customer'] })).toBe('/account');
+    expect(resolvePostLoginRedirect({ roles: ['business_owner'] })).toBe('/business/dashboard');
+    expect(resolvePostLoginRedirect({ roles: ['super_admin'] })).toBe('/admin');
+    expect(resolvePostLoginRedirect({ roles: ['customer'] }, '/saved')).toBe('/saved');
+
+    // Customer without memberships sees MerchantAccessDenied with all 4 required actions
+    const deniedHtml = renderToStaticMarkup(
+      React.createElement(MerchantAccessDenied, {
+        user: {
+          public_id: 'usr_cust',
+          name: 'Customer User',
+          email: 'cust@example.com',
+          phone_e164: '+919840011111',
+          phone_verified_at: null,
+          avatar_url: null,
+          roles: ['customer'],
+          permissions: [],
+          created_at: null,
+        },
+      })
+    );
+    expect(deniedHtml).toContain('Merchant Access Required');
+    expect(deniedHtml).toContain('Register Your Business');
+    expect(deniedHtml).toContain('Claim an Existing Business');
+    expect(deniedHtml).toContain('Browse Directory');
+    expect(deniedHtml).toContain('Go to My Account');
+    expect(deniedHtml).not.toContain('Open Super Admin Control Centre');
+
+    // Super Admin without business memberships also sees /admin link
+    const adminDeniedHtml = renderToStaticMarkup(
+      React.createElement(MerchantAccessDenied, {
+        user: {
+          public_id: 'usr_admin',
+          name: 'Platform Admin',
+          email: 'admin@example.com',
+          phone_e164: '+919840099999',
+          phone_verified_at: null,
+          avatar_url: null,
+          roles: ['super_admin'],
+          permissions: [],
+          created_at: null,
+        },
+      })
+    );
+    expect(adminDeniedHtml).toContain('Open Super Admin Control Centre');
+
+    // Authorized business staff on /business/dashboard is allowed
+    mockReadSession.mockResolvedValueOnce({
+      opaqueSessionId: 'sess_staff_2',
+      record: { accessToken: 'tok_staff_2', userPublicId: 'usr_staff_2' },
+    });
+    mockGetUser.mockResolvedValueOnce({
+      public_id: 'usr_staff_2',
+      name: 'Staff Member',
+      phone_e164: '+919840022222',
+      roles: ['customer'],
+      permissions: [],
+    });
+    mockCallLaravel.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      payload: {
+        status: 'success',
+        data: [{ public_id: '01BIZ123', name: 'Apex Dental Studio' }],
+      },
+    });
+    const staffRes = await authorizeBusinessDashboardAccess('/business/dashboard');
+    expect(staffRes.status).toBe('allowed');
   });
 });

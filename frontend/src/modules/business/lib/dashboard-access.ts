@@ -14,7 +14,10 @@ export type BusinessDashboardAccessResult =
 
 export function buildDashboardLoginRedirect(requestedPath?: string | null): string {
   const safePath =
-    requestedPath && requestedPath.startsWith('/dashboard') ? requestedPath : '/dashboard';
+    requestedPath &&
+    (requestedPath.startsWith('/dashboard') || requestedPath.startsWith('/business/dashboard'))
+      ? requestedPath
+      : '/business/dashboard';
   return `/login?next=${encodeURIComponent(safePath)}`;
 }
 

@@ -43,7 +43,7 @@ describe('LoginPage SSR & redirect sanitization regression', () => {
     const html = renderToStaticMarkup(element);
     expect(html).toContain('Sign in with Mobile OTP');
     expect(sanitizeInternalRedirectPath('/saved')).toBe('/saved');
-    expect(sanitizeInternalRedirectPath('//evil.example.com')).toBe('/dashboard/settings');
-    expect(sanitizeInternalRedirectPath('https://evil.example.com')).toBe('/dashboard/settings');
+    expect(sanitizeInternalRedirectPath('//evil.example.com')).toBe('/account');
+    expect(sanitizeInternalRedirectPath('https://evil.example.com')).toBe('/account');
   });
 });

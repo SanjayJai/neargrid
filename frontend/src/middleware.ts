@@ -21,6 +21,10 @@ export function middleware(request: NextRequest): NextResponse {
   if (
     pathname === '/dashboard' ||
     pathname.startsWith('/dashboard/') ||
+    pathname === '/business/dashboard' ||
+    pathname.startsWith('/business/dashboard/') ||
+    pathname === '/account' ||
+    pathname.startsWith('/account/') ||
     pathname === '/admin' ||
     pathname.startsWith('/admin/')
   ) {
@@ -45,5 +49,14 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ['/dashboard', '/dashboard/:path*', '/admin', '/admin/:path*'],
+  matcher: [
+    '/dashboard',
+    '/dashboard/:path*',
+    '/business/dashboard',
+    '/business/dashboard/:path*',
+    '/account',
+    '/account/:path*',
+    '/admin',
+    '/admin/:path*',
+  ],
 };
