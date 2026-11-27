@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Account\SavedBusinessController;
+use App\Http\Controllers\Api\V1\Admin\AdminAdCampaignController;
+use App\Http\Controllers\Api\V1\Admin\AdminAdCreativeController;
 use App\Http\Controllers\Api\V1\Admin\AdminAnalyticsController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminBootstrapController;
@@ -301,6 +303,25 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                 Route::get('/{entityType}/{entityIdentifier}', [AdminSeoController::class, 'show'])->name('show');
                 Route::put('/{entityType}/{entityIdentifier}', [AdminSeoController::class, 'upsert'])->name('upsert');
                 Route::post('/metadata/{seoMetadata}/rollback/{revision}', [AdminSeoController::class, 'rollback'])->name('rollback');
+            });
+
+            Route::prefix('advertising')->name('advertising.')->group(function (): void {
+                Route::get('/campaigns', [AdminAdCampaignController::class, 'index'])->name('campaigns.index');
+                Route::post('/campaigns', [AdminAdCampaignController::class, 'store'])->name('campaigns.store');
+                Route::get('/campaigns/{adCampaign}', [AdminAdCampaignController::class, 'show'])->name('campaigns.show');
+                Route::patch('/campaigns/{adCampaign}', [AdminAdCampaignController::class, 'update'])->name('campaigns.update');
+                Route::post('/campaigns/{adCampaign}/approve', [AdminAdCampaignController::class, 'approve'])->name('campaigns.approve');
+                Route::post('/campaigns/{adCampaign}/reject', [AdminAdCampaignController::class, 'reject'])->name('campaigns.reject');
+                Route::patch('/campaigns/{adCampaign}/status', [AdminAdCampaignController::class, 'updateStatus'])->name('campaigns.status');
+                Route::put('/campaigns/{adCampaign}/placements', [AdminAdCampaignController::class, 'syncPlacements'])->name('campaigns.placements.sync');
+                Route::put('/campaigns/{adCampaign}/businesses', [AdminAdCampaignController::class, 'syncBusinesses'])->name('campaigns.businesses.sync');
+                Route::delete('/campaigns/{adCampaign}', [AdminAdCampaignController::class, 'destroy'])->name('campaigns.destroy');
+
+                Route::get('/creatives', [AdminAdCreativeController::class, 'index'])->name('creatives.index');
+                Route::post('/creatives', [AdminAdCreativeController::class, 'store'])->name('creatives.store');
+                Route::patch('/creatives/{adCreative}', [AdminAdCreativeController::class, 'update'])->name('creatives.update');
+                Route::post('/creatives/upload-image', [AdminAdCreativeController::class, 'uploadImage'])->middleware('throttle:20,1')->name('creatives.upload');
+                Route::delete('/creatives/{adCreative}', [AdminAdCreativeController::class, 'destroy'])->name('creatives.destroy');
             });
 
             Route::prefix('domains')->name('domains.')->group(function (): void {

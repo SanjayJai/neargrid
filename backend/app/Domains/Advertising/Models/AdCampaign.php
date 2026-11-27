@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'created_by_user_id',
     'approved_by_admin_id',
     'name',
+    'description',
     'campaign_type',
     'status',
     'priority',

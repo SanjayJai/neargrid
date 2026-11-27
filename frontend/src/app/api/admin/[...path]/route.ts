@@ -26,6 +26,7 @@ const ALLOWED_PREFIXES = new Set([
   'permissions',
   'security',
   'erasure-requests',
+  'advertising',
 ]);
 
 const SAFE_SEGMENT_REGEX = /^[a-zA-Z0-9._-]+$/;
