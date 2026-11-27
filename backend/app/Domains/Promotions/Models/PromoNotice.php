@@ -56,6 +56,21 @@ class PromoNotice extends Model
 {
     use HasPublicUlid, SoftDeletes;
 
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'severity' => 'info',
+        'status' => 'draft',
+        'is_enabled' => true,
+        'priority' => 100,
+        'trigger_type' => 'page_load',
+        'trigger_delay_seconds' => 0,
+        'is_dismissible' => true,
+        'cooldown_hours' => 24,
+        'impressions_count' => 0,
+        'clicks_count' => 0,
+        'dismissals_count' => 0,
+    ];
+
     public const VALID_KINDS = ['popup', 'announcement'];
 
     public const VALID_NOTICE_TYPES = [

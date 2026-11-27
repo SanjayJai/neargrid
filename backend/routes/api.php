@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Admin\AdminAdCampaignController;
 use App\Http\Controllers\Api\V1\Admin\AdminAdCreativeController;
 use App\Http\Controllers\Api\V1\Admin\AdminAdPlacementController;
 use App\Http\Controllers\Api\V1\Advertising\PublicAdController;
+use App\Http\Controllers\Api\V1\Promotions\PublicPromoNoticeController;
 use App\Http\Controllers\Api\V1\Admin\AdminAnalyticsController;
 use App\Http\Controllers\Api\V1\Admin\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\Admin\AdminBootstrapController;
@@ -64,6 +65,12 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
         Route::get('/deliver', [PublicAdController::class, 'deliver'])->middleware('throttle:120,1')->name('deliver');
         Route::post('/impression', [PublicAdController::class, 'recordImpression'])->middleware('throttle:120,1')->name('impression');
         Route::post('/click', [PublicAdController::class, 'recordClick'])->middleware('throttle:60,1')->name('click');
+    });
+
+    // Public promo notices & announcements delivery & tracking (M6.2)
+    Route::prefix('public/notices')->name('public.notices.')->group(function (): void {
+        Route::get('/deliver', [PublicPromoNoticeController::class, 'deliver'])->middleware('throttle:120,1')->name('deliver');
+        Route::post('/event', [PublicPromoNoticeController::class, 'recordEvent'])->middleware('throttle:120,1')->name('event');
     });
 
     // Public business profiles (only status=active, privacy-safe resource)

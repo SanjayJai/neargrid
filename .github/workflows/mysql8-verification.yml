@@ -229,7 +229,11 @@ jobs:
             tests/Feature/Api/V1/Admin/AdminAdPlacementTest.php \
             tests/Feature/Api/V1/Advertising/AdDeliveryAndTrackingTest.php \
             tests/Feature/Api/V1/Advertising/AdConcurrencyAndSecurityTest.php \
-            tests/Feature/Database/PromoNoticeFoundationSchemaTest.php; do
+            tests/Feature/Database/PromoNoticeFoundationSchemaTest.php \
+            tests/Feature/Api/V1/Promotions/PromoNoticeDeliveryAndTrackingTest.php \
+            tests/Feature/Api/V1/Promotions/PromoNoticeConcurrencyTest.php \
+            tests/Feature/Api/V1/Promotions/PromoNoticeDeliveryAndTrackingTest.php \
+            tests/Feature/Api/V1/Promotions/PromoNoticeConcurrencyTest.php; do
             if [ ! -f "$test_file" ]; then
               echo "ERROR: Missing expected test file: $test_file" >&2
               exit 1
@@ -250,7 +254,9 @@ jobs:
             tests/Feature/Api/V1/Admin/AdminAdPlacementTest.php \
             tests/Feature/Api/V1/Advertising/AdDeliveryAndTrackingTest.php \
             tests/Feature/Api/V1/Advertising/AdConcurrencyAndSecurityTest.php \
-            tests/Feature/Database/PromoNoticeFoundationSchemaTest.php
+            tests/Feature/Database/PromoNoticeFoundationSchemaTest.php \
+            tests/Feature/Api/V1/Promotions/PromoNoticeDeliveryAndTrackingTest.php \
+            tests/Feature/Api/V1/Promotions/PromoNoticeConcurrencyTest.php
 
       - name: Verify migration rollback and re-migration on disposable DB
         working-directory: backend
