@@ -12,6 +12,7 @@ final readonly class SearchQuery
      * @param  list<string>  $localitySlugs
      * @param  list<string>  $amenitySlugs
      * @param  list<string>  $paymentMethodSlugs
+     * @param  array<string, mixed>  $attributeFilters
      */
     public function __construct(
         public ?string $rawQuery = null,
@@ -31,6 +32,7 @@ final readonly class SearchQuery
         public int $perPage = 20,
         public string $locale = 'en',
         public bool $isNearbyMode = false,
+        public array $attributeFilters = [],
     ) {}
 
     public function hasCoordinates(): bool

@@ -50,6 +50,7 @@ final class PublicBusinessController extends Controller
                 'amenities',
                 'paymentMethods',
                 'faqs',
+                'attributeValues.definition',
                 'media' => static fn ($q) => $q->publicApproved(),
             ])
             ->first();

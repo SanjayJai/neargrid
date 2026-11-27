@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\Admin\AdminVerificationController;
 use App\Http\Controllers\Api\V1\Auth\AccountController;
 use App\Http\Controllers\Api\V1\Auth\DeviceSessionController;
 use App\Http\Controllers\Api\V1\Auth\OtpAuthController;
+use App\Http\Controllers\Api\V1\Directory\OwnerBusinessAttributeController;
 use App\Http\Controllers\Api\V1\Directory\OwnerBusinessController;
 use App\Http\Controllers\Api\V1\Directory\OwnerOrganizationController;
 use App\Http\Controllers\Api\V1\Directory\OwnerReviewController;
@@ -102,6 +103,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::get('/{business}', [OwnerBusinessController::class, 'show'])->name('show');
             Route::put('/{business}', [OwnerBusinessController::class, 'update'])->name('update');
             Route::put('/{business}/hours', [OwnerBusinessController::class, 'updateHours'])->name('hours.update');
+
+            Route::get('/{business}/attributes', [OwnerBusinessAttributeController::class, 'show'])->name('attributes.show');
+            Route::put('/{business}/attributes', [OwnerBusinessAttributeController::class, 'update'])->name('attributes.update');
+            Route::post('/{business}/attributes/validate', [OwnerBusinessAttributeController::class, 'validateForPublish'])->name('attributes.validate');
+            Route::delete('/{business}/attributes/orphans', [OwnerBusinessAttributeController::class, 'destroyOrphans'])->name('attributes.orphans.destroy');
 
             Route::post('/{business}/services', [OwnerBusinessController::class, 'storeService'])->name('services.store');
             Route::put('/{business}/services/{service}', [OwnerBusinessController::class, 'updateService'])->name('services.update');

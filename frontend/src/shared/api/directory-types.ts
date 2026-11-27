@@ -401,6 +401,96 @@ export interface PublicBusinessProfileDto {
   payment_methods: Array<{ slug: string; name: string }>;
   faqs: Array<{ question: string; answer: string }>;
   media: PublicBusinessMediaDto[];
+  profile_sections?: ResolvedProfileSectionDto[];
+  attributes?: PublicBusinessAttributeDto[];
+}
+
+export interface PublicBusinessAttributeDto {
+  definition_public_id: string;
+  attribute_key: string;
+  section_key: string | null;
+  label: string;
+  label_en: string;
+  label_ta: string | null;
+  data_type: 'string' | 'number' | 'boolean' | 'enum' | 'multi_enum';
+  unit: string | null;
+  value: string | number | boolean | string[];
+  formatted_value: string;
+  sort_order: number;
+}
+
+export interface ResolvedProfileSectionDto {
+  section_key: string;
+  label: string;
+  display_label_en: string;
+  display_label_ta: string | null;
+  is_required: boolean;
+  suppress_when_empty: boolean;
+  sort_order: number;
+  has_content: boolean;
+  attributes: PublicBusinessAttributeDto[];
+}
+
+export interface OwnerBusinessAttributeItemDto {
+  definition_public_id: string;
+  attribute_key: string;
+  section_key: string | null;
+  label_en: string;
+  label_ta: string | null;
+  data_type: 'string' | 'number' | 'boolean' | 'enum' | 'multi_enum';
+  options_json: {
+    choices?: Array<string | { value?: string; key?: string; label?: string }>;
+    options?: Array<string | { value?: string; key?: string; label?: string }>;
+    min?: number;
+    max?: number;
+    step?: number;
+    integer_only?: boolean;
+    max_length?: number;
+    max_items?: number;
+  } | null;
+  unit: string | null;
+  is_filterable: boolean;
+  is_required: boolean;
+  show_on_profile: boolean;
+  sort_order: number;
+  category_public_id: string | null;
+  category_slug: string | null;
+  value_public_id: string | null;
+  value: string | number | boolean | string[] | null;
+  updated_at: string | null;
+}
+
+export interface OwnerOrphanedAttributeDto {
+  public_id: string;
+  attribute_definition_public_id: string | null;
+  attribute_key: string | null;
+  label_en: string | null;
+  label_ta: string | null;
+  data_type: string | null;
+  unit: string | null;
+  category_slug: string | null;
+  category_name: string | null;
+  reason: 'category_changed' | 'definition_inactive';
+  value: string | number | boolean | string[] | null;
+  updated_at: string | null;
+}
+
+export interface OwnerBusinessAttributesResponseDto {
+  business_public_id: string;
+  sections: Array<
+    CategoryProfileSectionDto & {
+      category_public_id: string | null;
+      category_slug: string | null;
+    }
+  >;
+  attributes: OwnerBusinessAttributeItemDto[];
+  orphaned_values: OwnerOrphanedAttributeDto[];
+  missing_required: Array<{
+    attribute_key: string;
+    label_en: string;
+    category_slug: string | null;
+  }>;
+  is_complete_for_publish: boolean;
 }
 
 export interface OwnerBusinessProfileDto {
@@ -630,6 +720,26 @@ export interface SearchSuggestionsMetaDto extends ApiMeta {
   };
 }
 
+export interface CategorySearchFilterDto {
+  filter_key: string;
+  filter_type: 'toggle' | 'select' | 'checkbox' | 'range';
+  data_type: 'boolean' | 'enum' | 'multi_enum' | 'number' | 'string';
+  label: string;
+  label_en: string;
+  label_ta: string | null;
+  unit: string | null;
+  options: Array<{ value: string; label: string }>;
+  min: number | null;
+  max: number | null;
+  sort_order: number;
+}
+
+export type SearchAttributeFilterValue =
+  | boolean
+  | string
+  | string[]
+  | { min?: number; max?: number };
+
 export interface SearchFiltersDataDto {
   cities: Array<{ slug: string; name: string; is_popular: boolean }>;
   localities: Array<{
@@ -654,6 +764,7 @@ export interface SearchFiltersDataDto {
     max_km: number;
     default_km: number;
   };
+  category_filters?: CategorySearchFilterDto[];
 }
 
 export interface SearchFiltersMetaDto extends ApiMeta {
@@ -681,6 +792,7 @@ export interface SearchQueryParams {
   open_now?: boolean;
   amenities?: string[];
   payment_methods?: string[];
+  attr?: Record<string, SearchAttributeFilterValue>;
   sort?: SearchSortOptionDto;
   page?: number;
   per_page?: number;

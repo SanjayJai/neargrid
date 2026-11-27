@@ -1,5 +1,6 @@
 import { callLaravelApi } from '@/lib/bff/laravel-client';
 import type { ApiErrorEnvelope } from '@/lib/bff/types';
+import { appendAttributeFiltersToSearchParams } from '@/modules/customer/lib/search-url';
 import type {
   CategoryLandingResponseDto,
   CategoryTreeResponseDto,
@@ -56,6 +57,7 @@ export function buildSearchQueryString(params: SearchQueryParams): string {
       if (pm) qs.append('payment_methods[]', pm);
     }
   }
+  appendAttributeFiltersToSearchParams(qs, params.attr);
   if (params.sort) qs.set('sort', params.sort);
   if (params.page !== undefined) qs.set('page', String(params.page));
   if (params.per_page !== undefined) qs.set('per_page', String(params.per_page));

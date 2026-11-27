@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources\Api\V1\Directory;
 
 use App\Domains\Directory\Models\Business;
+use App\Domains\Directory\Services\ProfileSectionResolverService;
 use App\Domains\Media\Models\BusinessMedia;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -24,6 +25,7 @@ final class PublicBusinessResource extends JsonResource
     public function toArray(Request $request): array
     {
         $locale = (string) $request->query('locale', 'en');
+        $dynamicProfile = app(ProfileSectionResolverService::class)->resolve($this->resource, $locale);
 
         return [
             'public_id' => $this->public_id,
@@ -112,6 +114,8 @@ final class PublicBusinessResource extends JsonResource
                 ])
                 ->values()
                 ->all(),
+            'profile_sections' => $dynamicProfile['profile_sections'],
+            'attributes' => $dynamicProfile['attributes'],
         ];
     }
 }

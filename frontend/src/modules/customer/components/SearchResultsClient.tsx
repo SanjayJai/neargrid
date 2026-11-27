@@ -71,6 +71,7 @@ export function SearchResultsClient({
     currentParams.verified_only ||
     currentParams.open_now ||
     currentParams.lat ||
+    (currentParams.attr && Object.keys(currentParams.attr).length > 0) ||
     (currentParams.sort && currentParams.sort !== 'relevance')
   );
 

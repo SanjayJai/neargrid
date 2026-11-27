@@ -45,6 +45,7 @@ import { BusinessClaimModal } from './BusinessClaimModal';
 import { BusinessMediaGallery } from './BusinessMediaGallery';
 import { BusinessProfileActions } from './BusinessProfileActions';
 import { CustomerReviewsSection } from './CustomerReviewsSection';
+import { DynamicAttributeSectionCard } from './DynamicAttributeSectionCard';
 import { EnquiryModal } from './EnquiryModal';
 
 interface BusinessProfileViewProps {
@@ -359,12 +360,26 @@ export function BusinessProfileView({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left Main Content Column (8 cols on desktop) */}
         <div className="space-y-6 lg:col-span-8">
-          {/* 1. Overview */}
+          {(() => {
+            const configuredSections = profile.profile_sections ?? [];
+            const allPublicAttributes = profile.attributes ?? [];
+            const claimedDefIds = new Set(
+              configuredSections.flatMap((s) => s.attributes.map((a) => a.definition_public_id))
+            );
+            const ungroupedAttributes = allPublicAttributes.filter(
+              (a) => !claimedDefIds.has(a.definition_public_id)
+            );
+
+            const renderBuiltin = (key: string, customTitle?: string) => {
+              switch (key) {
+                case 'overview':
+                  return (
           <section
+            key="overview"
             id="overview"
             className="scroll-mt-32 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
           >
-            <h2 className="text-lg font-bold text-ink">Overview</h2>
+            <h2 className="text-lg font-bold text-ink">{customTitle || 'Overview'}</h2>
             {profile.description ? (
               <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-muted">
                 {profile.description}
@@ -447,14 +462,16 @@ export function BusinessProfileView({
               </div>
             )}
           </section>
-
-          {/* 2. Services & Pricing */}
+                  );
+                case 'services':
+                  return (
           <section
+            key="services"
             id="services"
             className="scroll-mt-32 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
           >
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-bold text-ink">Services &amp; Pricing</h2>
+              <h2 className="text-lg font-bold text-ink">{customTitle || 'Services & Pricing'}</h2>
               {activeServices.length > 0 && (
                 <span className="text-xs font-medium text-ink-muted">
                   {activeServices.length} service{activeServices.length === 1 ? '' : 's'}
@@ -489,14 +506,17 @@ export function BusinessProfileView({
               </div>
             )}
           </section>
-
-          {/* 3. Photos */}
+                  );
+                case 'photos':
+                case 'gallery':
+                  return (
           <section
+            key="photos"
             id="photos"
             className="scroll-mt-32 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
           >
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-bold text-ink">Photos</h2>
+              <h2 className="text-lg font-bold text-ink">{customTitle || 'Photos'}</h2>
               {deliverableMedia.length > 0 && (
                 <span className="text-xs font-medium text-ink-muted">
                   {deliverableMedia.length} approved photo{deliverableMedia.length === 1 ? '' : 's'}
@@ -529,16 +549,18 @@ export function BusinessProfileView({
               </div>
             )}
           </section>
-
-          {/* 4. Opening Hours */}
+                  );
+                case 'hours':
+                  return (
           <section
+            key="hours"
             id="hours"
             className="scroll-mt-32 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-brand-600" aria-hidden="true" />
-                <h2 className="text-lg font-bold text-ink">Opening Hours</h2>
+                <h2 className="text-lg font-bold text-ink">{customTitle || 'Opening Hours'}</h2>
               </div>
               <div className="flex items-center gap-2">
                 <OpenStatusBadge isOpenNow={profile.is_open_now} />
@@ -601,15 +623,17 @@ export function BusinessProfileView({
               </dl>
             )}
           </section>
-
-          {/* 5. FAQs */}
+                  );
+                case 'faqs':
+                  return (
           <section
+            key="faqs"
             id="faqs"
             className="scroll-mt-32 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
           >
             <div className="flex items-center gap-2">
               <HelpCircle className="h-4 w-4 text-brand-600" aria-hidden="true" />
-              <h2 className="text-lg font-bold text-ink">Frequently Asked Questions</h2>
+              <h2 className="text-lg font-bold text-ink">{customTitle || 'Frequently Asked Questions'}</h2>
             </div>
 
             {profile.faqs.length === 0 ? (
@@ -640,9 +664,11 @@ export function BusinessProfileView({
               </div>
             )}
           </section>
-
-          {/* 6. Reviews (Live Customer Reviews & Submissions) */}
+                  );
+                case 'reviews':
+                  return (
           <section
+            key="reviews"
             id="reviews"
             className="scroll-mt-32 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
           >
@@ -654,6 +680,69 @@ export function BusinessProfileView({
               initialReviewCount={profile.review_count}
             />
           </section>
+                  );
+                default:
+                  return null;
+              }
+            };
+
+            if (configuredSections.length > 0) {
+              return (
+                <>
+                  {configuredSections.map((sec) => {
+                    const builtin = renderBuiltin(sec.section_key, sec.label);
+                    if (builtin !== null) {
+                      return (
+                        <div key={sec.section_key} className="space-y-6">
+                          {builtin}
+                          {sec.attributes.length > 0 && (
+                            <DynamicAttributeSectionCard
+                              id={`${sec.section_key}-attributes`}
+                              title={`${sec.label} Details`}
+                              attributes={sec.attributes}
+                            />
+                          )}
+                        </div>
+                      );
+                    }
+                    return (
+                      <DynamicAttributeSectionCard
+                        key={sec.section_key}
+                        id={sec.section_key}
+                        title={sec.label}
+                        attributes={sec.attributes}
+                      />
+                    );
+                  })}
+                  {ungroupedAttributes.length > 0 && (
+                    <DynamicAttributeSectionCard
+                      id="specifications"
+                      title="Specifications & Details"
+                      attributes={ungroupedAttributes}
+                    />
+                  )}
+                </>
+              );
+            }
+
+            return (
+              <>
+                {renderBuiltin('overview')}
+                {ungroupedAttributes.length > 0 && (
+                  <DynamicAttributeSectionCard
+                    id="specifications"
+                    title="Specifications & Details"
+                    attributes={ungroupedAttributes}
+                  />
+                )}
+                {renderBuiltin('services')}
+                {renderBuiltin('photos')}
+                {renderBuiltin('hours')}
+                {renderBuiltin('faqs')}
+                {renderBuiltin('reviews')}
+              </>
+            );
+          })()}
         </div>
 
         {/* Right Sticky Contact & Claim Sidebar (4 cols on desktop) */}

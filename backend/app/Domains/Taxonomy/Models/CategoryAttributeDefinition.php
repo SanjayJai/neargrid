@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Domains\Taxonomy\Models;
 
+use App\Domains\Directory\Models\BusinessAttributeValue;
 use App\Support\Concerns\HasPublicUlid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'category_id',
     'attribute_key',
+    'section_key',
     'label_en',
     'label_ta',
     'data_type',
@@ -48,5 +51,13 @@ class CategoryAttributeDefinition extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * @return HasMany<BusinessAttributeValue, $this>
+     */
+    public function values(): HasMany
+    {
+        return $this->hasMany(BusinessAttributeValue::class, 'attribute_definition_id');
     }
 }

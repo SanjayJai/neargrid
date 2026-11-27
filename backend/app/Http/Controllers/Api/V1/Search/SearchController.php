@@ -164,6 +164,7 @@ final class SearchController extends Controller
                 'rating_options' => $result->ratingOptions,
                 'sort_options' => $result->sortOptions,
                 'radius' => $result->radius,
+                'category_filters' => $result->categoryFilters,
             ],
             meta: [
                 'counts' => [

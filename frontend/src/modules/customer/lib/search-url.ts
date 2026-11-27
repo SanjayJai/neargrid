@@ -1,6 +1,58 @@
-import type { SearchQueryParams, SearchSortOptionDto } from '@/shared/api/directory-types';
+import type {
+  SearchAttributeFilterValue,
+  SearchQueryParams,
+  SearchSortOptionDto,
+} from '@/shared/api/directory-types';
 
 const SLUG_REGEX = /^[a-z0-9-]+$/;
+const ATTR_KEY_REGEX = /^[a-z0-9_]{1,80}$/;
+const MAX_ATTR_FILTERS = 8;
+
+export function appendAttributeFiltersToSearchParams(
+  params: URLSearchParams,
+  attr?: Record<string, SearchAttributeFilterValue> | null
+): void {
+  if (!attr || typeof attr !== 'object') return;
+  let count = 0;
+
+  for (const [key, val] of Object.entries(attr)) {
+    if (count >= MAX_ATTR_FILTERS) break;
+    if (!ATTR_KEY_REGEX.test(key) || val === undefined || val === null) continue;
+
+    if (typeof val === 'boolean') {
+      params.set(`attr[${key}]`, val ? '1' : '0');
+      count += 1;
+    } else if (typeof val === 'string') {
+      const trimmed = val.trim().slice(0, 100);
+      if (trimmed !== '') {
+        params.set(`attr[${key}]`, trimmed);
+        count += 1;
+      }
+    } else if (Array.isArray(val)) {
+      const items = val
+        .map((v) => String(v).trim().slice(0, 100))
+        .filter(Boolean)
+        .slice(0, 10);
+      if (items.length > 0) {
+        for (const item of items) {
+          params.append(`attr[${key}][]`, item);
+        }
+        count += 1;
+      }
+    } else if (typeof val === 'object') {
+      const hasMin = typeof val.min === 'number' && Number.isFinite(val.min);
+      const hasMax = typeof val.max === 'number' && Number.isFinite(val.max);
+      if (hasMin && hasMax && (val.min as number) > (val.max as number)) {
+        continue;
+      }
+      if (hasMin || hasMax) {
+        if (hasMin) params.set(`attr[${key}][min]`, String(val.min));
+        if (hasMax) params.set(`attr[${key}][max]`, String(val.max));
+        count += 1;
+      }
+    }
+  }
+}
 
 export type SupportedLocale = 'en' | 'ta';
 
@@ -65,6 +117,7 @@ export interface ShareableSearchUrlInput {
   amenities?: string[] | null;
   paymentMethods?: string[] | null;
   payment_methods?: string[] | null;
+  attr?: Record<string, SearchAttributeFilterValue> | null;
   sort?: string | null;
   page?: number | null;
   perPage?: number | null;
@@ -138,6 +191,8 @@ export function buildShareableSearchUrl(input: ShareableSearchUrlInput): string 
       if (s) params.append('payment_methods[]', s);
     }
   }
+
+  appendAttributeFiltersToSearchParams(params, input.attr);
 
   const sort = sanitizeSort(input.sort);
   if (sort && sort !== 'relevance') {
@@ -223,6 +278,68 @@ export function parseRawSearchParams(
 
   const locale = normalizeLocale(getSingle('locale'));
 
+  const attr: Record<string, SearchAttributeFilterValue> = {};
+  for (const [rawKey, rawVal] of Object.entries(rawParams)) {
+    if (Object.keys(attr).length >= MAX_ATTR_FILTERS) break;
+    if (rawVal === undefined) continue;
+
+    const multiMatch = rawKey.match(/^attr\[([a-z0-9_]{1,80})\]\[\]$/);
+    if (multiMatch) {
+      const key = multiMatch[1];
+      const list = (Array.isArray(rawVal) ? rawVal : [rawVal])
+        .map((v) => v.trim().slice(0, 100))
+        .filter(Boolean)
+        .slice(0, 10);
+      if (list.length > 0) {
+        attr[key] = Array.from(new Set(list));
+      }
+      continue;
+    }
+
+    const rangeMatch = rawKey.match(/^attr\[([a-z0-9_]{1,80})\]\[(min|max)\]$/);
+    if (rangeMatch) {
+      const key = rangeMatch[1];
+      const bound = rangeMatch[2] as 'min' | 'max';
+      const single = Array.isArray(rawVal) ? rawVal[0] : rawVal;
+      const num = Number(single);
+      if (single !== '' && Number.isFinite(num)) {
+        const existing =
+          typeof attr[key] === 'object' && attr[key] !== null && !Array.isArray(attr[key])
+            ? (attr[key] as { min?: number; max?: number })
+            : {};
+        existing[bound] = num;
+        attr[key] = existing;
+      }
+      continue;
+    }
+
+    const scalarMatch = rawKey.match(/^attr\[([a-z0-9_]{1,80})\]$/);
+    if (scalarMatch) {
+      const key = scalarMatch[1];
+      if (Array.isArray(rawVal)) {
+        const list = rawVal.map((v) => v.trim().slice(0, 100)).filter(Boolean).slice(0, 10);
+        if (list.length > 0) attr[key] = Array.from(new Set(list));
+      } else {
+        const trimmed = rawVal.trim().slice(0, 100);
+        if (trimmed === 'true') {
+          attr[key] = true;
+        } else if (trimmed === 'false') {
+          attr[key] = false;
+        } else if (trimmed !== '') {
+          attr[key] = trimmed;
+        }
+      }
+    }
+  }
+
+  for (const [key, val] of Object.entries(attr)) {
+    if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+      if (val.min !== undefined && val.max !== undefined && val.min > val.max) {
+        delete attr[key];
+      }
+    }
+  }
+
   return {
     city,
     category,
@@ -237,6 +354,7 @@ export function parseRawSearchParams(
     open_now: open_now || undefined,
     amenities: amenities.length > 0 ? amenities : undefined,
     payment_methods: payment_methods.length > 0 ? payment_methods : undefined,
+    attr: Object.keys(attr).length > 0 ? attr : undefined,
     sort,
     page,
     per_page,

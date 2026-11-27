@@ -15,6 +15,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { useOwnerBusiness } from '@/modules/business/context/OwnerBusinessContext';
+import { BusinessAttributesEditor } from './BusinessAttributesEditor';
 import { bffFetch } from '@/shared/api/bff-client';
 import type {
   OwnerBusinessProfileDto,
@@ -638,6 +639,8 @@ export function BusinessProfileForm() {
           </button>
         </div>
       </form>
+
+      <BusinessAttributesEditor />
     </div>
   );
 }

@@ -15,6 +15,7 @@ final readonly class FilterOptionsResult
      * @param  list<array<string, mixed>>  $ratingOptions
      * @param  list<array<string, mixed>>  $sortOptions
      * @param  array{min_km: float, max_km: float, default_km: float}  $radius
+     * @param  list<array<string, mixed>>  $categoryFilters
      */
     public function __construct(
         public array $cities,
@@ -27,5 +28,6 @@ final readonly class FilterOptionsResult
         public array $radius,
         public int $verifiedActiveCount,
         public int $totalActiveCount,
+        public array $categoryFilters = [],
     ) {}
 }

@@ -14,6 +14,8 @@ import {
   X,
 } from 'lucide-react';
 import type {
+  CategorySearchFilterDto,
+  SearchAttributeFilterValue,
   SearchFiltersDataDto,
   SearchQueryParams,
   SearchSortOptionDto,
@@ -118,7 +120,24 @@ export function HorizontalFilterBar({
   const isOpenNow = Boolean(currentParams.open_now);
   const selectedAmenities = currentParams.amenities ?? [];
   const selectedPayments = currentParams.payment_methods ?? [];
-  const moreCount = selectedAmenities.length + selectedPayments.length;
+  const categoryFilters = filtersData?.category_filters ?? [];
+  const activeAttr = currentParams.attr ?? {};
+  const activeAttrEntries = Object.entries(activeAttr);
+  const moreCount =
+    selectedAmenities.length + selectedPayments.length + activeAttrEntries.length;
+
+  function updateAttrFilter(key: string, value: SearchAttributeFilterValue | undefined) {
+    const next = { ...(currentParams.attr ?? {}) };
+    if (value === undefined) {
+      delete next[key];
+    } else {
+      next[key] = value;
+    }
+    onFilterChange({
+      attr: Object.keys(next).length > 0 ? next : undefined,
+      page: 1,
+    });
+  }
 
   return (
     <div className="sticky top-16 z-20 -mx-4 border-y border-gray-200 bg-white/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -298,9 +317,11 @@ export function HorizontalFilterBar({
             </select>
           </div>
 
-          {/* More Filters (Amenities & Payment Methods) */}
+          {/* More Filters (Amenities, Payment Methods & Category Attributes) */}
           {filtersData &&
-            (filtersData.amenities.length > 0 || filtersData.payment_methods.length > 0) && (
+            (filtersData.amenities.length > 0 ||
+              filtersData.payment_methods.length > 0 ||
+              categoryFilters.length > 0) && (
               <button
                 type="button"
                 onClick={() => setMoreOpen((prev) => !prev)}
@@ -402,6 +423,193 @@ export function HorizontalFilterBar({
                 </div>
               </div>
             )}
+
+            {categoryFilters.length > 0 && (
+              <div className="sm:col-span-2 border-t border-gray-200 pt-3">
+                <p className="mb-2.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  Category Filters
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {categoryFilters.map((filter: CategorySearchFilterDto) => {
+                    const currentVal = activeAttr[filter.filter_key];
+
+                    if (filter.filter_type === 'toggle' || filter.data_type === 'boolean') {
+                      const active = currentVal === true || currentVal === '1';
+                      return (
+                        <div key={filter.filter_key} className="flex items-center">
+                          <button
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() =>
+                              updateAttrFilter(filter.filter_key, active ? undefined : true)
+                            }
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                              active
+                                ? 'border-brand-600 bg-brand-600 text-white'
+                                : 'border-gray-200 bg-white text-ink hover:bg-gray-100'
+                            }`}
+                          >
+                            {active && <Check className="h-3 w-3" aria-hidden="true" />}
+                            <span>{filter.label}</span>
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    if (filter.filter_type === 'select' || filter.data_type === 'enum') {
+                      const selected = typeof currentVal === 'string' ? currentVal : '';
+                      return (
+                        <div key={filter.filter_key} className="space-y-1">
+                          <label
+                            htmlFor={`cat-filter-${filter.filter_key}`}
+                            className="block text-xs font-semibold text-ink"
+                          >
+                            {filter.label}
+                          </label>
+                          <select
+                            id={`cat-filter-${filter.filter_key}`}
+                            aria-label={filter.label}
+                            value={selected}
+                            onChange={(e) =>
+                              updateAttrFilter(
+                                filter.filter_key,
+                                e.target.value || undefined
+                              )
+                            }
+                            className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-medium text-ink focus:border-brand-500 focus:outline-none"
+                          >
+                            <option value="">Any {filter.label}</option>
+                            {filter.options.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
+
+                    if (filter.filter_type === 'checkbox' || filter.data_type === 'multi_enum') {
+                      const selectedList = Array.isArray(currentVal) ? currentVal : [];
+                      return (
+                        <div key={filter.filter_key} className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                          <p className="text-xs font-semibold text-ink">{filter.label}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {filter.options.map((opt) => {
+                              const active = selectedList.includes(opt.value);
+                              return (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  aria-pressed={active}
+                                  onClick={() => {
+                                    const nextList = active
+                                      ? selectedList.filter((v) => v !== opt.value)
+                                      : [...selectedList, opt.value];
+                                    updateAttrFilter(
+                                      filter.filter_key,
+                                      nextList.length > 0 ? nextList : undefined
+                                    );
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                                    active
+                                      ? 'border-brand-600 bg-brand-600 text-white'
+                                      : 'border-gray-200 bg-white text-ink hover:bg-gray-100'
+                                  }`}
+                                >
+                                  {active && <Check className="h-3 w-3" aria-hidden="true" />}
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (filter.filter_type === 'range' || filter.data_type === 'number') {
+                      const rangeVal =
+                        typeof currentVal === 'object' &&
+                        currentVal !== null &&
+                        !Array.isArray(currentVal)
+                          ? currentVal
+                          : {};
+                      return (
+                        <div key={filter.filter_key} className="space-y-1">
+                          <p className="text-xs font-semibold text-ink">
+                            {filter.label}
+                            {filter.unit ? ` (${filter.unit})` : ''}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              aria-label={`${filter.label} minimum`}
+                              placeholder={filter.min !== null ? `Min ${filter.min}` : 'Min'}
+                              min={filter.min ?? undefined}
+                              max={filter.max ?? undefined}
+                              value={rangeVal.min ?? ''}
+                              onChange={(e) => {
+                                const minNum =
+                                  e.target.value === '' ? undefined : Number(e.target.value);
+                                const nextMax = rangeVal.max;
+                                if (
+                                  minNum !== undefined &&
+                                  nextMax !== undefined &&
+                                  minNum > nextMax
+                                ) {
+                                  return;
+                                }
+                                if (minNum === undefined && nextMax === undefined) {
+                                  updateAttrFilter(filter.filter_key, undefined);
+                                } else {
+                                  updateAttrFilter(filter.filter_key, {
+                                    ...(minNum !== undefined ? { min: minNum } : {}),
+                                    ...(nextMax !== undefined ? { max: nextMax } : {}),
+                                  });
+                                }
+                              }}
+                              className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-ink focus:border-brand-500 focus:outline-none"
+                            />
+                            <span className="text-xs text-ink-muted">–</span>
+                            <input
+                              type="number"
+                              aria-label={`${filter.label} maximum`}
+                              placeholder={filter.max !== null ? `Max ${filter.max}` : 'Max'}
+                              min={filter.min ?? undefined}
+                              max={filter.max ?? undefined}
+                              value={rangeVal.max ?? ''}
+                              onChange={(e) => {
+                                const maxNum =
+                                  e.target.value === '' ? undefined : Number(e.target.value);
+                                const nextMin = rangeVal.min;
+                                if (
+                                  nextMin !== undefined &&
+                                  maxNum !== undefined &&
+                                  nextMin > maxNum
+                                ) {
+                                  return;
+                                }
+                                if (nextMin === undefined && maxNum === undefined) {
+                                  updateAttrFilter(filter.filter_key, undefined);
+                                } else {
+                                  updateAttrFilter(filter.filter_key, {
+                                    ...(nextMin !== undefined ? { min: nextMin } : {}),
+                                    ...(maxNum !== undefined ? { max: maxNum } : {}),
+                                  });
+                                }
+                              }}
+                              className="h-8 w-full rounded-lg border border-gray-200 bg-white px-2 text-xs text-ink focus:border-brand-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -453,6 +661,26 @@ export function HorizontalFilterBar({
                 <X className="h-3 w-3" aria-hidden="true" />
               </button>
             )}
+            {activeAttrEntries.map(([key, val]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => updateAttrFilter(key, undefined)}
+                className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-0.5 font-semibold text-brand-700 hover:bg-brand-100"
+              >
+                {key}:{' '}
+                {Array.isArray(val)
+                  ? val.join(', ')
+                  : typeof val === 'boolean'
+                    ? val
+                      ? 'Yes'
+                      : 'No'
+                    : typeof val === 'object' && val !== null
+                      ? `${val.min ?? ''}–${val.max ?? ''}`
+                      : String(val)}
+                <X className="h-3 w-3" aria-hidden="true" />
+              </button>
+            ))}
           </div>
         </div>
       </div>

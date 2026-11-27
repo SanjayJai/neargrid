@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Taxonomy\Services;
 
 use App\Domains\Directory\Models\Business;
+use App\Domains\Directory\Services\AttributeTypeRegistry;
 use App\Domains\Governance\Services\AuditLogger;
 use App\Domains\Leads\Models\Enquiry;
+use App\Domains\Search\Services\FilterOptionsService;
 use App\Domains\Seo\Services\RedirectLifecycleService;
 use App\Domains\Taxonomy\Exceptions\CategoryException;
 use App\Domains\Taxonomy\Models\Category;
@@ -544,24 +546,98 @@ final class CategoryManagementService
      */
     public function syncSchemas(Category $category, array $schemas, User $actor, ?string $ipAddress = null): Category
     {
+        $typeRegistry = app(AttributeTypeRegistry::class);
+
+        if (isset($schemas['attributes']) && is_array($schemas['attributes'])) {
+            $validSectionKeys = isset($schemas['profile_sections']) && is_array($schemas['profile_sections'])
+                ? array_values(array_unique(array_map(
+                    static fn (array $sec): string => trim((string) $sec['section_key']),
+                    $schemas['profile_sections']
+                )))
+                : CategoryProfileSection::query()
+                    ->where('category_id', $category->id)
+                    ->pluck('section_key')
+                    ->all();
+
+            foreach ($schemas['attributes'] as $idx => $attr) {
+                $typeRegistry->validateDefinitionOptions(
+                    (string) $attr['data_type'],
+                    is_array($attr['options_json'] ?? null) ? $attr['options_json'] : null,
+                    "attributes.{$idx}.options_json",
+                );
+
+                $sectionKey = isset($attr['section_key']) && is_string($attr['section_key'])
+                    ? trim($attr['section_key'])
+                    : null;
+                if ($sectionKey !== null && $sectionKey !== '' && ! in_array($sectionKey, $validSectionKeys, true)) {
+                    throw new CategoryException(
+                        'INVALID_SECTION_KEY_REFERENCE',
+                        "Attribute '{$attr['attribute_key']}' references unknown profile section '{$sectionKey}' for this category.",
+                        Response::HTTP_UNPROCESSABLE_ENTITY,
+                    );
+                }
+            }
+        }
+
         DB::transaction(function () use ($category, $schemas, $actor, $ipAddress): void {
-            if (isset($schemas['attributes']) && is_array($schemas['attributes'])) {
-                CategoryAttributeDefinition::query()->where('category_id', $category->id)->delete();
-                foreach ($schemas['attributes'] as $idx => $attr) {
-                    CategoryAttributeDefinition::query()->create([
+            if (isset($schemas['profile_sections']) && is_array($schemas['profile_sections'])) {
+                CategoryProfileSection::query()->where('category_id', $category->id)->delete();
+                foreach ($schemas['profile_sections'] as $idx => $sec) {
+                    CategoryProfileSection::query()->create([
                         'category_id' => $category->id,
-                        'attribute_key' => (string) $attr['attribute_key'],
-                        'label_en' => (string) $attr['label_en'],
-                        'label_ta' => $attr['label_ta'] ?? null,
-                        'data_type' => (string) $attr['data_type'],
-                        'options_json' => $attr['options_json'] ?? null,
-                        'unit' => $attr['unit'] ?? null,
-                        'is_filterable' => (bool) ($attr['is_filterable'] ?? false),
-                        'is_required' => (bool) ($attr['is_required'] ?? false),
-                        'show_on_profile' => (bool) ($attr['show_on_profile'] ?? true),
-                        'sort_order' => (int) ($attr['sort_order'] ?? $idx),
-                        'is_active' => (bool) ($attr['is_active'] ?? true),
+                        'section_key' => trim((string) $sec['section_key']),
+                        'display_label_en' => (string) $sec['display_label_en'],
+                        'display_label_ta' => $sec['display_label_ta'] ?? null,
+                        'is_enabled' => (bool) ($sec['is_enabled'] ?? true),
+                        'is_required' => (bool) ($sec['is_required'] ?? false),
+                        'suppress_when_empty' => (bool) ($sec['suppress_when_empty'] ?? true),
+                        'sort_order' => (int) ($sec['sort_order'] ?? $idx),
                     ]);
+                }
+            }
+
+            if (isset($schemas['attributes']) && is_array($schemas['attributes'])) {
+                $incomingKeys = [];
+                foreach ($schemas['attributes'] as $idx => $attr) {
+                    $attrKey = trim((string) $attr['attribute_key']);
+                    $incomingKeys[] = $attrKey;
+                    $sectionKey = isset($attr['section_key']) && is_string($attr['section_key']) && trim($attr['section_key']) !== ''
+                        ? trim($attr['section_key'])
+                        : null;
+
+                    CategoryAttributeDefinition::query()->updateOrCreate(
+                        [
+                            'category_id' => $category->id,
+                            'attribute_key' => $attrKey,
+                        ],
+                        [
+                            'section_key' => $sectionKey,
+                            'label_en' => (string) $attr['label_en'],
+                            'label_ta' => $attr['label_ta'] ?? null,
+                            'data_type' => (string) $attr['data_type'],
+                            'options_json' => $attr['options_json'] ?? null,
+                            'unit' => $attr['unit'] ?? null,
+                            'is_filterable' => (bool) ($attr['is_filterable'] ?? false),
+                            'is_required' => (bool) ($attr['is_required'] ?? false),
+                            'show_on_profile' => (bool) ($attr['show_on_profile'] ?? true),
+                            'sort_order' => (int) ($attr['sort_order'] ?? $idx),
+                            'is_active' => (bool) ($attr['is_active'] ?? true),
+                        ],
+                    );
+                }
+
+                $removedDefs = CategoryAttributeDefinition::query()
+                    ->where('category_id', $category->id)
+                    ->when($incomingKeys !== [], static fn ($q) => $q->whereNotIn('attribute_key', $incomingKeys))
+                    ->get();
+
+                foreach ($removedDefs as $removedDef) {
+                    if ($removedDef->values()->exists()) {
+                        $removedDef->is_active = false;
+                        $removedDef->save();
+                    } else {
+                        $removedDef->delete();
+                    }
                 }
             }
 
@@ -580,22 +656,6 @@ final class CategoryManagementService
                 }
             }
 
-            if (isset($schemas['profile_sections']) && is_array($schemas['profile_sections'])) {
-                CategoryProfileSection::query()->where('category_id', $category->id)->delete();
-                foreach ($schemas['profile_sections'] as $idx => $sec) {
-                    CategoryProfileSection::query()->create([
-                        'category_id' => $category->id,
-                        'section_key' => (string) $sec['section_key'],
-                        'display_label_en' => (string) $sec['display_label_en'],
-                        'display_label_ta' => $sec['display_label_ta'] ?? null,
-                        'is_enabled' => (bool) ($sec['is_enabled'] ?? true),
-                        'is_required' => (bool) ($sec['is_required'] ?? false),
-                        'suppress_when_empty' => (bool) ($sec['suppress_when_empty'] ?? true),
-                        'sort_order' => (int) ($sec['sort_order'] ?? $idx),
-                    ]);
-                }
-            }
-
             $this->recordRevision($category, $actor, 'Updated category attribute/filter/section schemas');
             $this->auditLogger->record(
                 actor: $actor,
@@ -609,6 +669,7 @@ final class CategoryManagementService
         });
 
         $this->treeService->invalidateCache();
+        app(FilterOptionsService::class)->invalidateForCategory($category);
 
         return $category->fresh(['attributeDefinitions', 'filterConfigs', 'profileSections']) ?? $category;
     }

@@ -27,6 +27,8 @@ use App\Domains\Search\Services\SearchSeoAdvisor;
 use App\Domains\Search\Services\SponsoredPlacementSelector;
 use App\Domains\Taxonomy\Models\Amenity;
 use App\Domains\Taxonomy\Models\Category;
+use App\Domains\Taxonomy\Models\CategoryAttributeDefinition;
+use App\Domains\Taxonomy\Models\CategoryFilterConfig;
 use App\Domains\Taxonomy\Models\PaymentMethod;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -79,6 +81,7 @@ final class MysqlSearchEngine implements SearchEngineInterface
             perPage: $query->perPage,
             locale: $query->locale,
             isNearbyMode: true,
+            attributeFilters: $query->attributeFilters,
         );
 
         return $this->executeSearch($nearbyQuery);
@@ -114,6 +117,7 @@ final class MysqlSearchEngine implements SearchEngineInterface
         }
 
         $explicitCategoryIds = [];
+        $resolvedCategory = null;
         if ($query->categorySlug !== null && $query->categorySlug !== '') {
             $category = Category::query()
                 ->where('slug', $query->categorySlug)
@@ -124,6 +128,7 @@ final class MysqlSearchEngine implements SearchEngineInterface
                 return $this->emptyResult($query, $parsed, $startedAt);
             }
 
+            $resolvedCategory = $category;
             $childIds = Category::query()
                 ->where('parent_id', $category->id)
                 ->where('is_active', true)
@@ -240,6 +245,13 @@ final class MysqlSearchEngine implements SearchEngineInterface
 
         if ($query->openNow) {
             $this->applyOpenNowFilter($builder, $timezone);
+        }
+
+        if ($query->attributeFilters !== []) {
+            if ($resolvedCategory === null) {
+                return $this->emptyResult($query, $parsed, $startedAt);
+            }
+            $this->applyCategoryAttributeFilters($builder, $resolvedCategory, $query->attributeFilters, $isMysql);
         }
 
         // 4. Spatial bounding-box & exact distance filter
@@ -542,6 +554,103 @@ final class MysqlSearchEngine implements SearchEngineInterface
         });
     }
 
+    /**
+     * Apply strictly allowlisted, parameter-bound WHERE EXISTS predicates for category attributes.
+     *
+     * @param  Builder<Business>  $builder
+     * @param  array<string, mixed>  $attributeFilters
+     */
+    private function applyCategoryAttributeFilters(
+        Builder $builder,
+        Category $category,
+        array $attributeFilters,
+        bool $isMysql,
+    ): void {
+        $bounded = array_slice($attributeFilters, 0, 8, true);
+        if ($bounded === []) {
+            return;
+        }
+
+        $definitions = CategoryAttributeDefinition::query()
+            ->where('category_id', $category->id)
+            ->where('is_active', true)
+            ->where('is_filterable', true)
+            ->whereIn('attribute_key', array_keys($bounded))
+            ->get()
+            ->keyBy('attribute_key');
+
+        $disabledFilterKeys = CategoryFilterConfig::query()
+            ->where('category_id', $category->id)
+            ->where('is_enabled', false)
+            ->pluck('filter_key')
+            ->flip();
+
+        foreach ($bounded as $key => $spec) {
+            /** @var CategoryAttributeDefinition|null $def */
+            $def = $definitions->get($key);
+            if ($def === null || $disabledFilterKeys->has($key) || ! is_array($spec)) {
+                // Fail closed if an unallowlisted filter reaches the search engine directly.
+                $builder->whereRaw('1 = 0');
+                return;
+            }
+
+            $builder->whereExists(static function ($sub) use ($def, $spec, $isMysql): void {
+                $sub->selectRaw('1')
+                    ->from('business_attribute_values as bav')
+                    ->whereColumn('bav.business_id', 'businesses.id')
+                    ->where('bav.attribute_definition_id', $def->id);
+
+                switch ($def->data_type) {
+                    case 'boolean':
+                        $sub->where('bav.value_boolean', (bool) ($spec['value'] ?? false));
+                        break;
+
+                    case 'enum':
+                    case 'string':
+                        $sub->where('bav.value_string', (string) ($spec['value'] ?? ''));
+                        break;
+
+                    case 'number':
+                        $min = $spec['min'] ?? null;
+                        $max = $spec['max'] ?? null;
+                        if ($min !== null) {
+                            $sub->where('bav.value_number', '>=', (float) $min);
+                        }
+                        if ($max !== null) {
+                            $sub->where('bav.value_number', '<=', (float) $max);
+                        }
+                        break;
+
+                    case 'multi_enum':
+                        /** @var list<string> $values */
+                        $values = is_array($spec['values'] ?? null) ? array_values($spec['values']) : [];
+                        if ($values === []) {
+                            $sub->whereRaw('1 = 0');
+                            break;
+                        }
+
+                        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+                            $sub->where(static function ($jsonQ) use ($values): void {
+                                foreach ($values as $val) {
+                                    $jsonQ->orWhereRaw(
+                                        "JSON_CONTAINS(bav.value_json, ?, '$')",
+                                        [json_encode((string) $val, JSON_THROW_ON_ERROR)]
+                                    );
+                                }
+                            });
+                        } else {
+                            $placeholders = implode(',', array_fill(0, count($values), '?'));
+                            $sub->whereRaw(
+                                "EXISTS (SELECT 1 FROM json_each(bav.value_json) AS je WHERE je.value IN ({$placeholders}))",
+                                array_map('strval', $values)
+                            );
+                        }
+                        break;
+                }
+            });
+        }
+    }
+
     private function emptyResult(SearchQuery $query, ParsedQuery $parsed, float $startedAt): SearchResult
     {
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
@@ -588,6 +697,7 @@ final class MysqlSearchEngine implements SearchEngineInterface
             'open_now' => $query->openNow,
             'amenities' => $query->amenitySlugs,
             'payment_methods' => $query->paymentMethodSlugs,
+            'attributes' => $query->attributeFilters,
             'sort' => $query->sort->value,
             'locale' => $query->locale,
         ];

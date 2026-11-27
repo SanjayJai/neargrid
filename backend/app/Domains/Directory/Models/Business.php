@@ -210,6 +210,14 @@ class Business extends Model
     }
 
     /**
+     * @return HasMany<BusinessAttributeValue, $this>
+     */
+    public function attributeValues(): HasMany
+    {
+        return $this->hasMany(BusinessAttributeValue::class);
+    }
+
+    /**
      * @return HasMany<BusinessMember, $this>
      */
     public function members(): HasMany
