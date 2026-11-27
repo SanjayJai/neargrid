@@ -199,14 +199,27 @@ jobs:
             }
           '
 
-      - name: Run MySQL 8 integration and location management tests
+      - name: Run MySQL 8 integration, location, and admin analytics tests
         working-directory: backend
         run: |
+          php -r '
+            require "vendor/autoload.php";
+            $app = require "bootstrap/app.php";
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            $driver = Illuminate\Support\Facades\DB::connection()->getDriverName();
+            $version = Illuminate\Support\Facades\DB::selectOne("SELECT VERSION() AS v")->v ?? "";
+            echo "Laravel DB driver={$driver} version={$version}\n";
+            if ($driver !== "mysql" || !str_starts_with($version, "8.")) {
+              fwrite(STDERR, "ERROR: Expected mysql 8.x, got {$driver} {$version}\n");
+              exit(1);
+            }
+          '
           for test_file in \
             tests/Feature/Database/MySql8SpatialIntegrationTest.php \
             tests/Feature/Database/MySql8DirectoryIntegrationTest.php \
             tests/Feature/Search/MySql8SearchEngineIntegrationTest.php \
-            tests/Feature/Api/V1/Locations/LocationManagementTest.php; do
+            tests/Feature/Api/V1/Locations/LocationManagementTest.php \
+            tests/Feature/Api/V1/Admin/AdminAnalyticsTest.php; do
             if [ ! -f "$test_file" ]; then
               echo "ERROR: Missing expected test file: $test_file" >&2
               exit 1
@@ -216,7 +229,8 @@ jobs:
             tests/Feature/Database/MySql8SpatialIntegrationTest.php \
             tests/Feature/Database/MySql8DirectoryIntegrationTest.php \
             tests/Feature/Search/MySql8SearchEngineIntegrationTest.php \
-            tests/Feature/Api/V1/Locations/LocationManagementTest.php
+            tests/Feature/Api/V1/Locations/LocationManagementTest.php \
+            tests/Feature/Api/V1/Admin/AdminAnalyticsTest.php
 
       - name: Verify migration rollback and re-migration on disposable DB
         working-directory: backend
